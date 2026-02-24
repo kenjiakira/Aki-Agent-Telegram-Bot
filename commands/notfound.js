@@ -1,25 +1,26 @@
 const config = {
-  name: "help",
-  description: "Hướng dẫn sử dụng bot",
-  useBy: 0,
-  category: "general",
+  name: "notfound",
+  description: "Hiển thị thông báo khi lệnh không tồn tại",
+  hide: true,
 };
 
 function execute(bot, msg, ctx) {
   const chatId = msg.chat.id;
   const commands = ctx?.commands || {};
 
+  const commandNames = Object.keys(commands).sort();
+  
+  let text = "❓ Lệnh không tồn tại\n\n";
+  text += "📋 Danh sách lệnh có sẵn:\n\n";
+  
   const byCategory = {};
-  for (const cmd of Object.values(commands)) {
+  for (const cmdName of commandNames) {
+    const cmd = commands[cmdName];
     if (cmd.config?.hide) continue;
     const cat = cmd.config?.category || "other";
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(cmd);
   }
-
-  let text = "📖 Hướng dẫn sử dụng\n\n";
-  text += "Bot tự động đăng tin AI news lên channel mỗi ngày lúc 8:00.\n\n";
-  text += "📌 Lệnh:\n\n";
 
   const order = ["general", "admin", "other"];
   for (const cat of order) {
@@ -27,15 +28,12 @@ function execute(bot, msg, ctx) {
     const label = cat === "admin" ? "🔐 Admin" : cat === "general" ? "📋 Chung" : "📁 Khác";
     text += `${label}\n`;
     for (const cmd of byCategory[cat]) {
-      let cmdLine = `/${cmd.config.name}`;
-      if (cmd.config.aliases && cmd.config.aliases.length > 0) {
-        cmdLine += ` (${cmd.config.aliases.map(a => `/${a}`).join(", ")})`;
-      }
-      cmdLine += ` - ${cmd.config.description}`;
-      text += `${cmdLine}\n`;
+      text += `  /${cmd.config.name} - ${cmd.config.description}\n`;
     }
     text += "\n";
   }
+
+  text += "\n💡 Gõ /help để xem hướng dẫn chi tiết.";
 
   bot.sendMessage(chatId, text.trim());
 }

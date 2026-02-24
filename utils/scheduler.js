@@ -1,8 +1,10 @@
 const cron = require("node-cron");
 const { postNews } = require("./rss");
 const { cleanupOldNews } = require("./database");
+const { loadScheduledCommands } = require("../commands/schedule");
 
 function setupScheduler(bot) {
+  // Default scheduled tasks
   cron.schedule("0 8 * * *", async () => {
     console.log("Posting AI news...");
     try {
@@ -21,6 +23,13 @@ function setupScheduler(bot) {
       console.error("Error cleanup:", err.message);
     }
   });
+
+  // Load user-scheduled commands
+  setTimeout(() => {
+    loadScheduledCommands(bot).catch(err => {
+      console.error("Error loading scheduled commands:", err.message);
+    });
+  }, 2000); // Wait 2 seconds for bot to be ready
 }
 
 module.exports = { setupScheduler };

@@ -1,4 +1,6 @@
 const { loadCommands } = require("./commands");
+const { parseCommand } = require("./commandParser");
+const { saveCommandHistory } = require("./database");
 
 const ALLOWED_IDS = process.env.ALLOWED_USER_IDS
   ? process.env.ALLOWED_USER_IDS.split(",").map((id) => id.trim())
@@ -26,9 +28,9 @@ function canUseCommand(cmd, userId) {
 }
 
 function setupListen(bot) {
-  const commands = loadCommands();
+  const { commands, aliases } = loadCommands();
 
-  bot.on("message", (msg) => {
+  bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from?.id;
     const text = (msg.text || "").trim();
@@ -42,14 +44,43 @@ function setupListen(bot) {
     const cmdName = match ? match[1].toLowerCase() : null;
 
     if (cmdName) {
-      const cmd = commands[cmdName];
+      // Check aliases first
+      const actualCmdName = aliases[cmdName] || cmdName;
+      const cmd = commands[actualCmdName];
+      
       if (cmd) {
         if (!canUseCommand(cmd, userId)) {
           bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
           return;
         }
-        const ctx = { commands };
-        cmd.execute(bot, msg, ctx);
+        
+        // Parse command with flags
+        const parsed = parseCommand(text);
+        const ctx = { 
+          commands, 
+          parsed,
+          aliases,
+        };
+        
+        // Execute command and save history
+        try {
+          await cmd.execute(bot, msg, ctx);
+          // Save successful command history
+          await saveCommandHistory(userId, actualCmdName, text, true);
+        } catch (err) {
+          // Save failed command history
+          await saveCommandHistory(userId, actualCmdName, text, false, err.message);
+          throw err; // Re-throw to let command handle error display
+        }
+      } else {
+        // Lệnh không tồn tại
+        const notfoundCmd = commands["notfound"];
+        if (notfoundCmd) {
+          const ctx = { commands, parsed: parseCommand(text), aliases };
+          notfoundCmd.execute(bot, msg, ctx);
+        } else {
+          bot.sendMessage(chatId, `❓ Lệnh /${cmdName} không tồn tại. Gõ /help để xem danh sách lệnh.`);
+        }
       }
       return;
     }
