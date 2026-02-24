@@ -12,6 +12,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
     "axios": "^1.13.5",
     "dotenv": "^17.3.1",
     "node-cron": "^4.2.1",

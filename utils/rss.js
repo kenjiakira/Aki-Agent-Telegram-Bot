@@ -1,4 +1,5 @@
 const OpenAI = require("openai");
+const { isAlreadyPosted, savePostedNews } = require("./database");
 
 const MODEL = process.env.OPENAI_NEWS_MODEL;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -29,12 +30,17 @@ async function fetchNews() {
   return raw;
 }
 
-async function postNews(bot) {
+async function postNews(bot, force = false) {
   const channelId = process.env.CHANNEL_ID;
   if (!channelId) throw new Error("CHANNEL_ID chưa cấu hình trong .env");
 
   const content = await fetchNews();
   if (!content.trim()) throw new Error("Không lấy được nội dung tin");
+
+  if (!force && (await isAlreadyPosted(content))) {
+    console.log("⚠️ Tin này đã được post trước đó, bỏ qua.");
+    throw new Error("Tin này đã được post trước đó. Dùng /post force để post lại.");
+  }
 
   const header = "🤖 Tin AI & Tech mới nhất\n\n";
   const message = header + content.trim();
@@ -42,18 +48,20 @@ async function postNews(bot) {
 
   if (message.length <= maxLen) {
     await bot.sendMessage(channelId, message, { parse_mode: "Markdown" });
-    return;
+  } else {
+    const parts = [];
+    let remaining = message;
+    while (remaining.length > 0) {
+      parts.push(remaining.slice(0, maxLen));
+      remaining = remaining.slice(maxLen);
+    }
+    for (const part of parts) {
+      await bot.sendMessage(channelId, part, { parse_mode: "Markdown" });
+    }
   }
 
-  const parts = [];
-  let remaining = message;
-  while (remaining.length > 0) {
-    parts.push(remaining.slice(0, maxLen));
-    remaining = remaining.slice(maxLen);
-  }
-  for (const part of parts) {
-    await bot.sendMessage(channelId, part, { parse_mode: "Markdown" });
-  }
+  await savePostedNews(content);
+  console.log("✅ Đã lưu tin vào database.");
 }
 
 module.exports = { postNews, fetchNews };
