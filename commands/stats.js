@@ -1,4 +1,5 @@
 const { getPostedNews, supabase } = require("../utils/database");
+const { formatVN, hoursAgoVN, daysAgoVN } = require("../utils/time");
 
 const config = {
   name: "stats",
@@ -20,23 +21,21 @@ async function execute(bot, msg) {
       throw countError;
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgo = daysAgoVN(7);
     const { count: weekCount, error: weekError } = await supabase
       .from("posted_news")
       .select("*", { count: "exact", head: true })
-      .gte("posted_at", sevenDaysAgo.toISOString());
+      .gte("posted_at", sevenDaysAgo);
 
     if (weekError) {
       throw weekError;
     }
 
-    const oneDayAgo = new Date();
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    const oneDayAgo = hoursAgoVN(24);
     const { count: dayCount, error: dayError } = await supabase
       .from("posted_news")
       .select("*", { count: "exact", head: true })
-      .gte("posted_at", oneDayAgo.toISOString());
+      .gte("posted_at", oneDayAgo);
 
     if (dayError) {
       throw dayError;
@@ -44,7 +43,7 @@ async function execute(bot, msg) {
 
     const recentPosts = await getPostedNews(1);
     const lastPostDate = recentPosts.length > 0 
-      ? new Date(recentPosts[0].posted_at).toLocaleString("vi-VN")
+      ? formatVN(recentPosts[0].posted_at)
       : "Chưa có";
 
     let text = "📊 Thống kê tin đã post\n\n";

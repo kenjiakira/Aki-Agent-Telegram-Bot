@@ -1,4 +1,5 @@
 const { supabase } = require("../utils/database");
+const { formatVN } = require("../utils/time");
 
 const config = {
   name: "status",
@@ -34,7 +35,7 @@ async function execute(bot, msg) {
     text += `   Supabase URL: ${process.env.SUPABASE_URL ? "✅ Đã cấu hình" : "❌ Chưa cấu hình"}\n`;
     text += `   Admin IDs: ${process.env.ADMIN_USER_IDS ? process.env.ADMIN_USER_IDS.split(",").length + " admin(s)" : "Chưa cấu hình"}\n`;
     
-    text += `\n🕐 Thời gian server: ${new Date().toLocaleString("vi-VN")}\n`;
+    text += `\n🕐 Giờ VN (UTC+7): ${formatVN(new Date())}\n`;
 
     await bot.sendMessage(chatId, text.trim());
   } catch (err) {

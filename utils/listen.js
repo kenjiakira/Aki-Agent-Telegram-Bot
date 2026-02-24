@@ -93,6 +93,20 @@ function setupListen(bot) {
       }
       return;
     }
+
+    // Tin nhắn không phải lệnh: thử xử lý bởi command có handleMessage (vd. luồng reminder)
+    if (text) {
+      for (const cmd of Object.values(commands)) {
+        if (typeof cmd.handleMessage === "function") {
+          try {
+            const handled = await cmd.handleMessage(bot, msg);
+            if (handled) return;
+          } catch (err) {
+            console.error("handleMessage error:", err);
+          }
+        }
+      }
+    }
   });
 
   bot.on("callback_query", async (query) => {

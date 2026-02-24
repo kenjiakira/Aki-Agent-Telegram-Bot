@@ -1,5 +1,6 @@
 const { getPostedNews, getCommandHistory } = require("../utils/database");
 const { getFlag } = require("../utils/commandParser");
+const { formatVN } = require("../utils/time");
 
 const config = {
   name: "history",
@@ -30,7 +31,7 @@ async function execute(bot, msg, ctx) {
       let text = `📜 Lịch sử tin đã post (${posts.length} tin gần nhất)\n\n`;
 
       posts.forEach((post, index) => {
-        const date = new Date(post.posted_at).toLocaleString("vi-VN");
+        const date = formatVN(post.posted_at);
         const preview = post.content_preview.replace(/\n/g, " ").substring(0, 100);
         const urlCount = post.urls?.length || 0;
         text += `${index + 1}. ${date}\n`;
@@ -60,7 +61,7 @@ async function execute(bot, msg, ctx) {
       let text = `📜 Lịch sử commands (${commands.length} lệnh gần nhất)\n\n`;
 
       commands.forEach((cmd, index) => {
-        const date = new Date(cmd.executed_at).toLocaleString("vi-VN");
+        const date = formatVN(cmd.executed_at);
         const status = cmd.success ? "✅" : "❌";
         text += `${index + 1}. ${status} /${cmd.command_name}\n`;
         text += `   ⏰ ${date}\n`;

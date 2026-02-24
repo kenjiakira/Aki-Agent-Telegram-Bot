@@ -5,6 +5,7 @@ const {
   updateScheduledCommand 
 } = require("../utils/database");
 const { hasFlag, getFlag } = require("../utils/commandParser");
+const { todayAtVN, getVNDateParts } = require("../utils/time");
 const cron = require("node-cron");
 
 const config = {
@@ -34,20 +35,10 @@ function parseTimeToCron(timeStr, scheduleType) {
   } else if (scheduleType === "weekly") {
     return `${minute} ${hour} * * 0`;
   } else {
-    const now = new Date();
-    const scheduled = new Date();
-    scheduled.setHours(hour, minute, 0, 0);
-    scheduled.setSeconds(0);
-    scheduled.setMilliseconds(0);
-    
-    if (scheduled <= now) {
-      scheduled.setDate(scheduled.getDate() + 1);
-    }
-    
-    const day = scheduled.getDate();
-    const month = scheduled.getMonth() + 1;
-    
-    return `${minute} ${hour} ${day} ${month} *`;
+    // once: giờ nhập là giờ VN (UTC+7)
+    const nextRun = todayAtVN(hour, minute);
+    const parts = getVNDateParts(nextRun);
+    return `${parts.minute} ${parts.hour} ${parts.day} ${parts.month} *`;
   }
 }
 
@@ -166,7 +157,7 @@ function buildListText(schedules) {
       : schedule.schedule_type === "weekly" ? "Hàng tuần"
       : "Một lần";
     text += `${index + 1}. ${status} /${schedule.command_name}\n`;
-    text += `   ⏰ ${schedule.schedule_time} (${typeLabel})\n`;
+    text += `   ⏰ ${schedule.schedule_time} (${typeLabel}, giờ VN)\n`;
     text += `   📝 ${schedule.command_text}\n`;
     text += `   🆔 ID: ${schedule.id}\n\n`;
   });

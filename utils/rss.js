@@ -5,17 +5,13 @@ const {
   getPostedUrls,
   extractUrls,
 } = require("./database");
+const { formatDateVN } = require("./time");
 
 const MODEL = process.env.OPENAI_NEWS_MODEL;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildQuery(postedUrls = []) {
-  const today = new Date();
-  const dateStr = today.toLocaleDateString("vi-VN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const dateStr = formatDateVN(new Date());
 
   let query = `Tin tức công nghệ AI và software mới nhất ngày ${dateStr}. `;
   query += `Liệt kê 5 tin quan trọng, mỗi tin có: tiêu đề, tóm tắt ngắn 1-2 câu, link nguồn. `;
@@ -76,14 +72,9 @@ async function postNews(bot, force = false) {
   const urls = extractUrls(content);
   console.log(`📰 Tìm thấy ${urls.length} URLs trong tin:`, urls);
 
-  if (!force) {
-    const isDuplicate = await isAlreadyPosted(content);
-    if (isDuplicate) {
-      console.log("⚠️ Tin này đã được post trước đó (hash hoặc URL trùng), bỏ qua.");
-      throw new Error(
-        "Tin này đã được post trước đó (có URL hoặc nội dung trùng). Dùng /post force để post lại."
-      );
-    }
+  const isDuplicate = await isAlreadyPosted(content);
+  if (!force && isDuplicate) {
+    console.log("⚠️ Tin trùng — tự động force post.");
   }
 
   const header = "🤖 Tin AI & Tech mới nhất\n\n";

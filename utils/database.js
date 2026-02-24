@@ -329,6 +329,77 @@ async function updateScheduledCommand(scheduleId, updates) {
   return data;
 }
 
+/**
+ * Reminders (bảng reminders cần tạo trong Supabase, xem migrations/reminders.sql)
+ */
+async function createReminder(userId, chatId, text, triggerAt) {
+  const { data, error } = await supabase
+    .from("reminders")
+    .insert({
+      user_id: userId,
+      chat_id: chatId,
+      text: text.trim(),
+      trigger_at: new Date(triggerAt).toISOString(),
+      status: "pending",
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getRemindersByUser(userId, status = "pending") {
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", status)
+    .order("trigger_at", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function getDueReminders() {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("status", "pending")
+    .lte("trigger_at", now)
+    .order("trigger_at", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function markReminderSent(id) {
+  const { data, error } = await supabase
+    .from("reminders")
+    .update({ status: "sent" })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function cancelReminder(id, userId) {
+  const { data, error } = await supabase
+    .from("reminders")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   isAlreadyPosted,
   savePostedNews,
@@ -346,4 +417,10 @@ module.exports = {
   getScheduledCommands,
   deleteScheduledCommand,
   updateScheduledCommand,
+  // Reminders
+  createReminder,
+  getRemindersByUser,
+  getDueReminders,
+  markReminderSent,
+  cancelReminder,
 };
