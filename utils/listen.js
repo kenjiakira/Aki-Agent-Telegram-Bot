@@ -84,7 +84,7 @@ function setupListen(bot) {
       } else {
         const notfoundCmd = commands["notfound"];
         if (notfoundCmd) {
-          const ctx = { commands, parsed: parseCommand(text), aliases };
+          const ctx = { commands, parsed: parseCommand(text), aliases, isAdmin: isAdmin(userId) };
           notfoundCmd.execute(bot, msg, ctx);
         } else {
           bot.sendMessage(chatId, `❓ Lệnh /${cmdName} không tồn tại. Gõ /help để xem danh sách lệnh.`);
