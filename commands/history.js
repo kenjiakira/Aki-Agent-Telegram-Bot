@@ -6,6 +6,7 @@ const config = {
   description: "Xem lịch sử commands đã chạy hoặc tin đã post",
   useBy: 0,
   category: "general",
+  callbacks: ["history_news", "history_commands"],
 };
 
 async function execute(bot, msg, ctx) {
@@ -40,7 +41,13 @@ async function execute(bot, msg, ctx) {
         text += `\n`;
       });
 
-      await bot.sendMessage(chatId, text.trim());
+      text += `\n💡 Bấm nút bên dưới để xem lịch sử lệnh đã chạy.`;
+      const replyMarkupNews = {
+        reply_markup: {
+          inline_keyboard: [[{ text: "📜 Lịch sử lệnh", callback_data: "history_commands" }]],
+        },
+      };
+      await bot.sendMessage(chatId, text.trim(), replyMarkupNews);
     } else {
       // Show command history (default)
       const commands = await getCommandHistory(userId, limit);
@@ -69,13 +76,35 @@ async function execute(bot, msg, ctx) {
         text += `\n`;
       });
 
-      text += `\n💡 Dùng /history --type=news để xem lịch sử tin đã post.`;
+      text += `\n💡 Bấm nút bên dưới để xem lịch sử tin đã post.`;
 
-      await bot.sendMessage(chatId, text.trim());
+      const replyMarkup = {
+        reply_markup: {
+          inline_keyboard: [[{ text: "📰 Lịch sử tin đã post", callback_data: "history_news" }]],
+        },
+      };
+      await bot.sendMessage(chatId, text.trim(), replyMarkup);
     }
   } catch (err) {
     await bot.sendMessage(chatId, `❌ Lỗi: ${err.message}`);
   }
 }
 
-module.exports = { config, execute };
+async function handleCallback(bot, query, ctx) {
+  const chatId = query.message.chat.id;
+  const data = query.data;
+
+  await bot.answerCallbackQuery(query.id);
+
+  const parsed = {
+    name: "history",
+    args: [],
+    flags: { type: data === "history_news" ? "news" : "commands" },
+    raw: "",
+  };
+  const fakeMsg = { chat: { id: chatId }, from: query.from };
+  const ctxWithParsed = { ...ctx, parsed };
+  await execute(bot, fakeMsg, ctxWithParsed);
+}
+
+module.exports = { config, execute, handleCallback };

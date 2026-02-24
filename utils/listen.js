@@ -19,12 +19,25 @@ function isAdmin(userId) {
   return ADMIN_IDS.includes(String(userId));
 }
 
-/** useBy: 0 = all, 1 = admin */
 function canUseCommand(cmd, userId) {
   const useBy = cmd.config?.useBy ?? 0;
   if (useBy === 0) return true;
   if (useBy === 1) return isAdmin(userId);
   return false;
+}
+
+function findCallbackHandler(commands, data) {
+  if (!data) return null;
+  for (const cmd of Object.values(commands)) {
+    const callbacks = cmd.config?.callbacks;
+    if (!callbacks || !Array.isArray(callbacks) || typeof cmd.handleCallback !== "function")
+      continue;
+    const match = callbacks.some((c) =>
+      c.endsWith("_") ? data.startsWith(c) : data === c
+    );
+    if (match) return cmd;
+  }
+  return null;
 }
 
 function setupListen(bot) {
@@ -44,7 +57,6 @@ function setupListen(bot) {
     const cmdName = match ? match[1].toLowerCase() : null;
 
     if (cmdName) {
-      // Check aliases first
       const actualCmdName = aliases[cmdName] || cmdName;
       const cmd = commands[actualCmdName];
       
@@ -54,26 +66,22 @@ function setupListen(bot) {
           return;
         }
         
-        // Parse command with flags
         const parsed = parseCommand(text);
         const ctx = { 
           commands, 
           parsed,
           aliases,
+          isAdmin: isAdmin(userId),
         };
         
-        // Execute command and save history
         try {
           await cmd.execute(bot, msg, ctx);
-          // Save successful command history
           await saveCommandHistory(userId, actualCmdName, text, true);
         } catch (err) {
-          // Save failed command history
           await saveCommandHistory(userId, actualCmdName, text, false, err.message);
-          throw err; // Re-throw to let command handle error display
+          throw err;
         }
       } else {
-        // Lệnh không tồn tại
         const notfoundCmd = commands["notfound"];
         if (notfoundCmd) {
           const ctx = { commands, parsed: parseCommand(text), aliases };
@@ -84,8 +92,22 @@ function setupListen(bot) {
       }
       return;
     }
+  });
 
-    bot.sendMessage(chatId, "Bot đang hoạt động OK 🚀");
+  bot.on("callback_query", async (query) => {
+    const userId = query.from?.id;
+    const data = query.data;
+
+    if (!hasPermission(userId)) {
+      await bot.answerCallbackQuery(query.id, { text: "⛔ Bạn không có quyền." });
+      return;
+    }
+
+    const ctx = { commands, parsed: {}, aliases, isAdmin: isAdmin(userId) };
+    const handler = findCallbackHandler(commands, data);
+    if (handler) {
+      await handler.handleCallback(bot, query, ctx);
+    }
   });
 }
 

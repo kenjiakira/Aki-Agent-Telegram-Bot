@@ -12,14 +12,10 @@ const config = {
   description: "Lên lịch chạy command tự động",
   useBy: 1,
   category: "admin",
+  callbacks: ["schedule_list", "schedule_refresh", "schedule_help", "schedule_add", "schedule_delete_"],
 };
 
-// Store active cron jobs
 const activeJobs = new Map();
-
-/**
- * Parse time string (HH:MM) to cron expression
- */
 function parseTimeToCron(timeStr, scheduleType) {
   const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
   if (!timeMatch) {
@@ -33,28 +29,23 @@ function parseTimeToCron(timeStr, scheduleType) {
     throw new Error("Giờ hoặc phút không hợp lệ");
   }
 
-  // Format: minute hour day month dayOfWeek
   if (scheduleType === "daily") {
-    return `${minute} ${hour} * * *`; // Every day at HH:MM
+    return `${minute} ${hour} * * *`;
   } else if (scheduleType === "weekly") {
-    return `${minute} ${hour} * * 0`; // Every Sunday at HH:MM
+    return `${minute} ${hour} * * 0`;
   } else {
-    // Once: schedule for next occurrence (today or tomorrow)
     const now = new Date();
     const scheduled = new Date();
     scheduled.setHours(hour, minute, 0, 0);
     scheduled.setSeconds(0);
     scheduled.setMilliseconds(0);
     
-    // If time already passed today, schedule for tomorrow
     if (scheduled <= now) {
       scheduled.setDate(scheduled.getDate() + 1);
     }
     
-    // Cron format: minute hour day month dayOfWeek
-    // For "once", we schedule specific date
     const day = scheduled.getDate();
-    const month = scheduled.getMonth() + 1; // Cron months are 1-12
+    const month = scheduled.getMonth() + 1;
     
     return `${minute} ${hour} ${day} ${month} *`;
   }
@@ -117,6 +108,116 @@ async function loadScheduledCommands(bot) {
   }
 }
 
+function getMainKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "📋 Xem lịch", callback_data: "schedule_list" },
+          { text: "➕ Cách thêm", callback_data: "schedule_add" },
+          { text: "📖 Hướng dẫn", callback_data: "schedule_help" },
+        ],
+      ],
+    },
+  };
+}
+
+function getListKeyboard(schedules) {
+  const rows = [[{ text: "🔄 Làm mới", callback_data: "schedule_refresh" }]];
+  if (schedules.length > 0) {
+    const deleteRow = schedules.map((s) => ({
+      text: `🗑 ${s.id}`,
+      callback_data: `schedule_delete_${s.id}`,
+    }));
+    rows.push(deleteRow);
+  }
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+function getHelpText() {
+  return (
+    "📖 Cách sử dụng /schedule\n\n" +
+    "• /schedule add <command> --time=\"HH:MM\" --daily\n" +
+    "  Ví dụ: /schedule add post --time=\"09:00\" --daily\n\n" +
+    "• /schedule list — Xem danh sách\n" +
+    "• /schedule delete <id> — Xóa\n" +
+    "• /schedule enable <id> — Bật\n" +
+    "• /schedule disable <id> — Tắt"
+  );
+}
+
+function getAddHintText() {
+  return (
+    "➕ Thêm lịch\n\n" +
+    "Gõ lệnh:\n" +
+    "/schedule add post --time=\"09:00\" --daily\n\n" +
+    "• --daily — hàng ngày\n" +
+    "• --weekly — hàng tuần (Chủ nhật)\n" +
+    "• Bỏ qua — chạy một lần"
+  );
+}
+
+function buildListText(schedules) {
+  if (schedules.length === 0) return null;
+  let text = `📋 Danh sách scheduled commands (${schedules.length})\n\n`;
+  schedules.forEach((schedule, index) => {
+    const status = schedule.enabled ? "✅" : "❌";
+    const typeLabel = schedule.schedule_type === "daily" ? "Hàng ngày"
+      : schedule.schedule_type === "weekly" ? "Hàng tuần"
+      : "Một lần";
+    text += `${index + 1}. ${status} /${schedule.command_name}\n`;
+    text += `   ⏰ ${schedule.schedule_time} (${typeLabel})\n`;
+    text += `   📝 ${schedule.command_text}\n`;
+    text += `   🆔 ID: ${schedule.id}\n\n`;
+  });
+  text += "💡 Bấm 🗑 <id> để xóa, hoặc /schedule delete <id>.";
+  return text;
+}
+
+async function handleCallback(bot, query, ctx) {
+  const chatId = query.message.chat.id;
+  const userId = query.from?.id;
+  const data = query.data;
+
+  await bot.answerCallbackQuery(query.id);
+
+  if (data === "schedule_list" || data === "schedule_refresh") {
+    const schedules = await getScheduledCommands(userId);
+    if (schedules.length === 0) {
+      await bot.sendMessage(chatId, "📭 Chưa có scheduled command nào.\n\nChọn nút bên dưới:", getMainKeyboard());
+      return;
+    }
+    const text = buildListText(schedules);
+    await bot.sendMessage(chatId, text, getListKeyboard(schedules));
+    return;
+  }
+
+  if (data === "schedule_help") {
+    await bot.sendMessage(chatId, getHelpText());
+    return;
+  }
+
+  if (data === "schedule_add") {
+    await bot.sendMessage(chatId, getAddHintText());
+    return;
+  }
+
+  if (data.startsWith("schedule_delete_")) {
+    const idStr = data.replace("schedule_delete_", "");
+    const scheduleId = parseInt(idStr, 10);
+    if (!idStr || isNaN(scheduleId)) {
+      await bot.sendMessage(chatId, "❌ ID không hợp lệ.");
+      return;
+    }
+    if (activeJobs.has(scheduleId)) {
+      activeJobs.get(scheduleId).stop();
+      activeJobs.delete(scheduleId);
+    }
+    await deleteScheduledCommand(scheduleId);
+    await bot.sendMessage(chatId, `✅ Đã xóa scheduled command ID: ${scheduleId}`);
+  }
+}
+
 async function execute(bot, msg, ctx) {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
@@ -160,35 +261,22 @@ async function execute(bot, msg, ctx) {
       text += `⏰ Thời gian: ${time}\n`;
       text += `🔄 Loại: ${scheduleType === "daily" ? "Hàng ngày" : scheduleType === "weekly" ? "Hàng tuần" : "Một lần"}\n`;
       text += `🆔 ID: ${schedule.id}\n`;
-      text += `\n💡 Dùng /schedule list để xem danh sách.`;
+      text += `\n💡 Bấm nút bên dưới để xem danh sách.`;
 
-      await bot.sendMessage(chatId, text);
+      await bot.sendMessage(chatId, text, {
+        reply_markup: {
+          inline_keyboard: [[{ text: "📋 Xem lịch", callback_data: "schedule_list" }]],
+        },
+      });
     } else if (action === "list") {
       const schedules = await getScheduledCommands(userId);
 
       if (schedules.length === 0) {
-        await bot.sendMessage(chatId, "📭 Chưa có scheduled command nào.");
+        await bot.sendMessage(chatId, "📭 Chưa có scheduled command nào.\n\nChọn nút bên dưới:", getMainKeyboard());
         return;
       }
 
-      let text = `📋 Danh sách scheduled commands (${schedules.length})\n\n`;
-
-      schedules.forEach((schedule, index) => {
-        const status = schedule.enabled ? "✅" : "❌";
-        const typeLabel = schedule.schedule_type === "daily" ? "Hàng ngày" 
-          : schedule.schedule_type === "weekly" ? "Hàng tuần"
-          : "Một lần";
-        
-        text += `${index + 1}. ${status} /${schedule.command_name}\n`;
-        text += `   ⏰ ${schedule.schedule_time} (${typeLabel})\n`;
-        text += `   📝 ${schedule.command_text}\n`;
-        text += `   🆔 ID: ${schedule.id}\n`;
-        text += `\n`;
-      });
-
-      text += `💡 Dùng /schedule delete <id> để xóa.`;
-
-      await bot.sendMessage(chatId, text.trim());
+      await bot.sendMessage(chatId, buildListText(schedules), getListKeyboard(schedules));
     } else if (action === "delete") {
       const scheduleId = parsed?.args[1];
       if (!scheduleId) {
@@ -230,13 +318,8 @@ async function execute(bot, msg, ctx) {
     } else {
       await bot.sendMessage(
         chatId,
-        "📖 Cách sử dụng:\n\n" +
-        "• /schedule add <command> --time=\"HH:MM\" --daily\n" +
-        "  Ví dụ: /schedule add post --time=\"09:00\" --daily\n\n" +
-        "• /schedule list - Xem danh sách\n" +
-        "• /schedule delete <id> - Xóa\n" +
-        "• /schedule enable <id> - Bật\n" +
-        "• /schedule disable <id> - Tắt"
+        "📅 Lịch chạy command\n\nChọn nút bên dưới hoặc gõ /schedule list, /schedule add ...",
+        getMainKeyboard()
       );
     }
   } catch (err) {
@@ -244,4 +327,4 @@ async function execute(bot, msg, ctx) {
   }
 }
 
-module.exports = { config, execute, loadScheduledCommands };
+module.exports = { config, execute, handleCallback, loadScheduledCommands };
