@@ -67,13 +67,14 @@ function setupListen(bot) {
         }
         
         const parsed = parseCommand(text);
-        const ctx = { 
-          commands, 
+        const ctx = {
+          commands,
           parsed,
           aliases,
           isAdmin: isAdmin(userId),
+          pingStart: Date.now(),
         };
-        
+
         try {
           await cmd.execute(bot, msg, ctx);
           await saveCommandHistory(userId, actualCmdName, text, true);
