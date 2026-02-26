@@ -329,9 +329,6 @@ async function updateScheduledCommand(scheduleId, updates) {
   return data;
 }
 
-/**
- * Reminders (bảng reminders cần tạo trong Supabase, xem migrations/reminders.sql)
- */
 async function createReminder(userId, chatId, text, triggerAt) {
   const { data, error } = await supabase
     .from("reminders")
@@ -400,6 +397,59 @@ async function cancelReminder(id, userId) {
   return data;
 }
 
+async function getReminderPresetsByUser(userId) {
+  const { data, error } = await supabase
+    .from("reminder_presets")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return (data || []).map((r) => ({
+    key: r.key,
+    label: r.label,
+    type: r.type,
+    value: r.value,
+    hour: r.hour,
+    minute: r.minute,
+    id: r.id,
+  }));
+}
+
+async function saveReminderPreset(userId, preset) {
+  const row = {
+    user_id: userId,
+    key: preset.key,
+    label: preset.label,
+    type: preset.type,
+    value: preset.value ?? null,
+    hour: preset.hour ?? null,
+    minute: preset.minute ?? null,
+    sort_order: preset.sort_order ?? 0,
+  };
+  const { data, error } = await supabase
+    .from("reminder_presets")
+    .insert(row)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function deleteReminderPreset(id, userId) {
+  const { data, error } = await supabase
+    .from("reminder_presets")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   isAlreadyPosted,
   savePostedNews,
@@ -423,4 +473,7 @@ module.exports = {
   getDueReminders,
   markReminderSent,
   cancelReminder,
+  getReminderPresetsByUser,
+  saveReminderPreset,
+  deleteReminderPreset,
 };
