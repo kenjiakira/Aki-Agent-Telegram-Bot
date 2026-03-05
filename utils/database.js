@@ -329,6 +329,102 @@ async function updateScheduledCommand(scheduleId, updates) {
   return data;
 }
 
+const ALLOWED_IDS_ENV = process.env.ALLOWED_USER_IDS
+  ? process.env.ALLOWED_USER_IDS.split(",").map((id) => id.trim()).filter(Boolean)
+  : [];
+const ADMIN_IDS_ENV = process.env.ADMIN_USER_IDS
+  ? process.env.ADMIN_USER_IDS.split(",").map((id) => id.trim()).filter(Boolean)
+  : [];
+
+async function getBotUser(telegramId) {
+  const { data, error } = await supabase
+    .from("bot_users")
+    .select("*")
+    .eq("telegram_id", telegramId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function upsertBotUser(telegramId, profile = {}) {
+  const existing = await getBotUser(telegramId);
+  const isAdminEnv = ADMIN_IDS_ENV.includes(String(telegramId));
+  const defaultAllowed = ALLOWED_IDS_ENV.length === 0;
+
+  const row = {
+    telegram_id: telegramId,
+    username: profile.username ?? existing?.username ?? null,
+    first_name: profile.first_name ?? existing?.first_name ?? null,
+    last_name: profile.last_name ?? existing?.last_name ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!existing) {
+    row.role = isAdminEnv ? "admin" : "user";
+    row.allowed = defaultAllowed;
+    row.created_at = row.updated_at;
+    const { data, error } = await supabase.from("bot_users").insert(row).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from("bot_users")
+    .update(row)
+    .eq("telegram_id", telegramId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateBotUser(telegramId, updates) {
+  const allowed = ["role", "allowed", "username", "first_name", "last_name"];
+  const body = {};
+  for (const k of allowed) {
+    if (updates[k] !== undefined) body[k] = updates[k];
+  }
+  if (Object.keys(body).length === 0) return getBotUser(telegramId);
+
+  const { data, error } = await supabase
+    .from("bot_users")
+    .update(body)
+    .eq("telegram_id", telegramId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getBotUsers(options = {}) {
+  const { limit = 50, role = null, allowed = null } = options;
+  let query = supabase
+    .from("bot_users")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (role) query = query.eq("role", role);
+  if (allowed !== null) query = query.eq("allowed", !!allowed);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function getPermission(telegramId) {
+  const user = await getBotUser(telegramId);
+  if (user) {
+    return {
+      allowed: user.allowed,
+      isAdmin: user.role === "admin",
+    };
+  }
+  return {
+    allowed: ALLOWED_IDS_ENV.length === 0 || ALLOWED_IDS_ENV.includes(String(telegramId)),
+    isAdmin: ADMIN_IDS_ENV.includes(String(telegramId)),
+  };
+}
 
 module.exports = {
   isAlreadyPosted,
@@ -339,12 +435,16 @@ module.exports = {
   extractUrls,
   normalizeUrl,
   supabase,
-  // Command history
   saveCommandHistory,
   getCommandHistory,
-  // Scheduling
   saveScheduledCommand,
   getScheduledCommands,
   deleteScheduledCommand,
   updateScheduledCommand,
+  // Bot users
+  getBotUser,
+  upsertBotUser,
+  updateBotUser,
+  getBotUsers,
+  getPermission,
 };

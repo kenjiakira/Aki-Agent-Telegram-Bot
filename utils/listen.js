@@ -1,28 +1,15 @@
 const { loadCommands } = require("./commands");
 const { parseCommand } = require("./commandParser");
-const { saveCommandHistory } = require("./database");
+const {
+  saveCommandHistory,
+  upsertBotUser,
+  getPermission,
+} = require("./database");
 
-const ALLOWED_IDS = process.env.ALLOWED_USER_IDS
-  ? process.env.ALLOWED_USER_IDS.split(",").map((id) => id.trim())
-  : [];
-
-const ADMIN_IDS = process.env.ADMIN_USER_IDS
-  ? process.env.ADMIN_USER_IDS.split(",").map((id) => id.trim())
-  : [];
-
-function hasPermission(userId) {
-  if (ALLOWED_IDS.length === 0) return true;
-  return ALLOWED_IDS.includes(String(userId));
-}
-
-function isAdmin(userId) {
-  return ADMIN_IDS.includes(String(userId));
-}
-
-function canUseCommand(cmd, userId) {
+function canUseCommand(cmd, isAdmin) {
   const useBy = cmd.config?.useBy ?? 0;
   if (useBy === 0) return true;
-  if (useBy === 1) return isAdmin(userId);
+  if (useBy === 1) return isAdmin;
   return false;
 }
 
@@ -48,9 +35,22 @@ function setupListen(bot) {
     const userId = msg.from?.id;
     const text = (msg.text || "").trim();
 
-    if (!hasPermission(userId)) {
-      bot.sendMessage(chatId, "⛔ Bạn không có quyền sử dụng bot.");
-      return;
+    let permission = { allowed: true, isAdmin: false };
+    if (userId) {
+      try {
+        await upsertBotUser(userId, {
+          username: msg.from?.username,
+          first_name: msg.from?.first_name,
+          last_name: msg.from?.last_name,
+        });
+      } catch (err) {
+        console.error("upsertBotUser error:", err.message);
+      }
+      permission = await getPermission(userId);
+      if (!permission.allowed) {
+        bot.sendMessage(chatId, "⛔ Bạn không có quyền sử dụng bot.");
+        return;
+      }
     }
 
     const match = text.match(/^\/(\w+)/);
@@ -59,19 +59,19 @@ function setupListen(bot) {
     if (cmdName) {
       const actualCmdName = aliases[cmdName] || cmdName;
       const cmd = commands[actualCmdName];
-      
+
       if (cmd) {
-        if (!canUseCommand(cmd, userId)) {
+        if (!canUseCommand(cmd, permission.isAdmin)) {
           bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
           return;
         }
-        
+
         const parsed = parseCommand(text);
         const ctx = {
           commands,
           parsed,
           aliases,
-          isAdmin: isAdmin(userId),
+          isAdmin: permission.isAdmin,
           pingStart: Date.now(),
         };
 
@@ -85,13 +85,43 @@ function setupListen(bot) {
       } else {
         const notfoundCmd = commands["notfound"];
         if (notfoundCmd) {
-          const ctx = { commands, parsed: parseCommand(text), aliases, isAdmin: isAdmin(userId) };
+          const ctx = { commands, parsed: parseCommand(text), aliases, isAdmin: permission.isAdmin };
           notfoundCmd.execute(bot, msg, ctx);
         } else {
           bot.sendMessage(chatId, `❓ Lệnh /${cmdName} không tồn tại. Gõ /help để xem danh sách lệnh.`);
         }
       }
       return;
+    }
+
+    if (text) {
+      const firstWord = text.split(/\s+/)[0]?.toLowerCase();
+      if (firstWord) {
+        const actualCmdName = aliases[firstWord] || firstWord;
+        const cmd = commands[actualCmdName];
+        if (cmd && cmd.config?.usePrefix === false) {
+          if (!canUseCommand(cmd, permission.isAdmin)) {
+            bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
+            return;
+          }
+          const parsed = parseCommand("/" + text);
+          const ctx = {
+            commands,
+            parsed,
+            aliases,
+            isAdmin: permission.isAdmin,
+            pingStart: Date.now(),
+          };
+          try {
+            await cmd.execute(bot, msg, ctx);
+            await saveCommandHistory(userId, actualCmdName, text, true);
+          } catch (err) {
+            await saveCommandHistory(userId, actualCmdName, text, false, err.message);
+            throw err;
+          }
+          return;
+        }
+      }
     }
 
     if (text) {
@@ -112,17 +142,19 @@ function setupListen(bot) {
     const userId = query.from?.id;
     const data = query.data;
 
-    if (!hasPermission(userId)) {
-      await bot.answerCallbackQuery(query.id, { text: "⛔ Bạn không có quyền." });
-      return;
-    }
-
-    const ctx = { commands, parsed: {}, aliases, isAdmin: isAdmin(userId) };
-    const handler = findCallbackHandler(commands, data);
-    if (handler) {
-      await handler.handleCallback(bot, query, ctx);
+    if (userId) {
+      const permission = await getPermission(userId);
+      if (!permission.allowed) {
+        await bot.answerCallbackQuery(query.id, { text: "⛔ Bạn không có quyền." });
+        return;
+      }
+      const ctx = { commands, parsed: {}, aliases, isAdmin: permission.isAdmin };
+      const handler = findCallbackHandler(commands, data);
+      if (handler) {
+        await handler.handleCallback(bot, query, ctx);
+      }
     }
   });
 }
 
-module.exports = { setupListen, hasPermission, isAdmin, loadCommands };
+module.exports = { setupListen, getPermission, canUseCommand, loadCommands };
