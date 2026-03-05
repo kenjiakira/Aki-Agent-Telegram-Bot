@@ -1,11 +1,12 @@
-const { 
-  saveScheduledCommand, 
-  getScheduledCommands, 
+const {
+  saveScheduledCommand,
+  getScheduledCommands,
   deleteScheduledCommand,
-  updateScheduledCommand 
+  updateScheduledCommand,
 } = require("../utils/database");
 const { hasFlag, getFlag } = require("../utils/commandParser");
 const { todayAtVN, getVNDateParts } = require("../utils/time");
+const { formatError } = require("../utils/errorMessages");
 const cron = require("node-cron");
 
 const config = {
@@ -35,7 +36,6 @@ function parseTimeToCron(timeStr, scheduleType) {
   } else if (scheduleType === "weekly") {
     return `${minute} ${hour} * * 0`;
   } else {
-    // once: giờ nhập là giờ VN (UTC+7)
     const nextRun = todayAtVN(hour, minute);
     const parts = getVNDateParts(nextRun);
     return `${parts.minute} ${parts.hour} ${parts.day} ${parts.month} *`;
@@ -205,7 +205,7 @@ async function handleCallback(bot, query, ctx) {
       activeJobs.delete(scheduleId);
     }
     await deleteScheduledCommand(scheduleId);
-    await bot.sendMessage(chatId, `✅ Đã xóa scheduled command ID: ${scheduleId}`);
+    await bot.sendMessage(chatId, `✅ Đã xóa 1 lịch (ID: ${scheduleId}).`);
   }
 }
 
@@ -281,7 +281,7 @@ async function execute(bot, msg, ctx) {
       }
 
       await deleteScheduledCommand(scheduleId);
-      await bot.sendMessage(chatId, `✅ Đã xóa scheduled command ID: ${scheduleId}`);
+      await bot.sendMessage(chatId, `✅ Đã xóa 1 lịch (ID: ${scheduleId}).`);
     } else if (action === "enable" || action === "disable") {
       const scheduleId = parsed?.args[1];
       if (!scheduleId) {
@@ -305,7 +305,7 @@ async function execute(bot, msg, ctx) {
         }
       }
 
-      await bot.sendMessage(chatId, `✅ Đã ${enabled ? "bật" : "tắt"} scheduled command ID: ${scheduleId}`);
+      await bot.sendMessage(chatId, `✅ Đã ${enabled ? "bật" : "tắt"} 1 lịch (ID: ${scheduleId}).`);
     } else {
       await bot.sendMessage(
         chatId,
@@ -314,7 +314,7 @@ async function execute(bot, msg, ctx) {
       );
     }
   } catch (err) {
-    await bot.sendMessage(chatId, `❌ Lỗi: ${err.message}`);
+    await bot.sendMessage(chatId, formatError(err, "database"));
   }
 }
 

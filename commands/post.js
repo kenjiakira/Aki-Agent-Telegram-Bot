@@ -1,6 +1,7 @@
 const { postNews, fetchNews } = require("../utils/rss");
 const { hasFlag, getFlag } = require("../utils/commandParser");
 const { extractUrls, isAlreadyPosted } = require("../utils/database");
+const { formatError } = require("../utils/errorMessages");
 
 const config = {
   name: "post",
@@ -17,9 +18,8 @@ async function execute(bot, msg, ctx) {
   const force = hasFlag(parsed, "force") || hasFlag(parsed, "f");
   const preview = hasFlag(parsed, "preview") || hasFlag(parsed, "p");
 
-  // Preview mode: fetch and show content without posting
   if (preview) {
-    const statusMsg = await bot.sendMessage(chatId, "⏳ Đang lấy tin để preview...");
+    const statusMsg = await bot.sendMessage(chatId, "⏳ Đang xử lý...");
 
     try {
       const content = await fetchNews();
@@ -42,7 +42,6 @@ async function execute(bot, msg, ctx) {
         previewText += `\n💡 Dùng --force để post lại tin này.`;
       }
 
-      // Split message if too long
       const maxLen = 4000;
       if (previewText.length <= maxLen) {
         await bot.editMessageText(previewText, {
@@ -58,7 +57,7 @@ async function execute(bot, msg, ctx) {
         });
       }
     } catch (err) {
-      await bot.editMessageText(`❌ Lỗi khi preview: ${err.message}`, {
+      await bot.editMessageText(formatError(err, "rss"), {
         chat_id: chatId,
         message_id: statusMsg.message_id,
       });
@@ -66,20 +65,16 @@ async function execute(bot, msg, ctx) {
     return;
   }
 
-  // Normal post mode
-  const statusMsg = await bot.sendMessage(
-    chatId,
-    force ? "⏳ Đang lấy tin và gửi lên channel (force mode)..." : "⏳ Đang lấy tin và gửi lên channel..."
-  );
+  const statusMsg = await bot.sendMessage(chatId, "⏳ Đang xử lý...");
 
   try {
     await postNews(bot, force);
-    await bot.editMessageText("✅ Đã gửi tin lên channel!", {
+    await bot.editMessageText("✅ Đã post 1 tin lên channel.", {
       chat_id: chatId,
       message_id: statusMsg.message_id,
     });
   } catch (err) {
-    await bot.editMessageText(`❌ Lỗi: ${err.message}`, {
+    await bot.editMessageText(formatError(err, "rss"), {
       chat_id: chatId,
       message_id: statusMsg.message_id,
     });

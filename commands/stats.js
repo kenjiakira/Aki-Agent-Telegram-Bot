@@ -1,5 +1,6 @@
 const { getPostedNews, supabase } = require("../utils/database");
 const { formatVN, hoursAgoVN, daysAgoVN } = require("../utils/time");
+const { formatError } = require("../utils/errorMessages");
 
 const config = {
   name: "stats",
@@ -11,6 +12,8 @@ const config = {
 
 async function execute(bot, msg) {
   const chatId = msg.chat.id;
+
+  const statusMsg = await bot.sendMessage(chatId, "⏳ Đang xử lý...");
 
   try {
     const { count, error: countError } = await supabase
@@ -52,9 +55,15 @@ async function execute(bot, msg) {
     text += `⏰ 24 giờ qua: ${dayCount || 0}\n`;
     text += `🕐 Tin gần nhất: ${lastPostDate}\n`;
 
-    await bot.sendMessage(chatId, text.trim());
+    await bot.editMessageText(text.trim(), {
+      chat_id: chatId,
+      message_id: statusMsg.message_id,
+    });
   } catch (err) {
-    await bot.sendMessage(chatId, `❌ Lỗi: ${err.message}`);
+    await bot.editMessageText(formatError(err, "database"), {
+      chat_id: chatId,
+      message_id: statusMsg.message_id,
+    });
   }
 }
 

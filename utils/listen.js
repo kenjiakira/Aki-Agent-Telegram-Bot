@@ -94,7 +94,6 @@ function setupListen(bot) {
       return;
     }
 
-    // Tin nhắn không phải lệnh: thử xử lý bởi command có handleMessage (vd. luồng reminder)
     if (text) {
       for (const cmd of Object.values(commands)) {
         if (typeof cmd.handleMessage === "function") {

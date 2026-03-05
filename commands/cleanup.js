@@ -1,4 +1,5 @@
 const { cleanupOldNews } = require("../utils/database");
+const { formatError } = require("../utils/errorMessages");
 
 const config = {
   name: "cleanup",
@@ -19,23 +20,20 @@ async function execute(bot, msg) {
     return;
   }
 
-  const statusMsg = await bot.sendMessage(
-    chatId,
-    `⏳ Đang xóa tin cũ hơn ${daysOld} ngày...`
-  );
+  const statusMsg = await bot.sendMessage(chatId, "⏳ Đang xử lý...");
 
   try {
     const deletedCount = await cleanupOldNews(daysOld);
     
     await bot.editMessageText(
-      `✅ Đã xóa ${deletedCount} tin cũ hơn ${daysOld} ngày.`,
+      `✅ Đã xóa ${deletedCount} tin cũ (hơn ${daysOld} ngày).`,
       {
         chat_id: chatId,
         message_id: statusMsg.message_id,
       }
     );
   } catch (err) {
-    await bot.editMessageText(`❌ Lỗi: ${err.message}`, {
+    await bot.editMessageText(formatError(err, "database"), {
       chat_id: chatId,
       message_id: statusMsg.message_id,
     });

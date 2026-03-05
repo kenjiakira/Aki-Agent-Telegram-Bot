@@ -1,6 +1,7 @@
 const { getPostedNews, getCommandHistory } = require("../utils/database");
 const { getFlag } = require("../utils/commandParser");
 const { formatVN } = require("../utils/time");
+const { formatError } = require("../utils/errorMessages");
 
 const config = {
   name: "history",
@@ -10,6 +11,8 @@ const config = {
   callbacks: ["history_news", "history_commands"],
 };
 
+const MAX_EDIT_LEN = 4000;
+
 async function execute(bot, msg, ctx) {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
@@ -18,13 +21,17 @@ async function execute(bot, msg, ctx) {
   const type = getFlag(parsed, "type", "commands"); // 'commands' or 'news'
   const limit = parseInt(getFlag(parsed, "limit", "10")) || 10;
 
+  const statusMsg = await bot.sendMessage(chatId, "⏳ Đang xử lý...");
+
   try {
     if (type === "news") {
-      // Show news history
       const posts = await getPostedNews(limit);
 
       if (posts.length === 0) {
-        await bot.sendMessage(chatId, "📭 Chưa có tin nào được post.");
+        await bot.editMessageText("📭 Chưa có tin nào được post.", {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+        });
         return;
       }
 
@@ -48,13 +55,28 @@ async function execute(bot, msg, ctx) {
           inline_keyboard: [[{ text: "📜 Lịch sử lệnh", callback_data: "history_commands" }]],
         },
       };
-      await bot.sendMessage(chatId, text.trim(), replyMarkupNews);
+      const toSend = text.trim();
+      if (toSend.length <= MAX_EDIT_LEN) {
+        await bot.editMessageText(toSend, {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+          ...replyMarkupNews,
+        });
+      } else {
+        await bot.editMessageText(toSend.substring(0, MAX_EDIT_LEN - 50) + "\n\n... (đã cắt bớt)", {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+          ...replyMarkupNews,
+        });
+      }
     } else {
-      // Show command history (default)
       const commands = await getCommandHistory(userId, limit);
 
       if (commands.length === 0) {
-        await bot.sendMessage(chatId, "📭 Chưa có lệnh nào được chạy.");
+        await bot.editMessageText("📭 Chưa có lệnh nào được chạy.", {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+        });
         return;
       }
 
@@ -84,10 +106,26 @@ async function execute(bot, msg, ctx) {
           inline_keyboard: [[{ text: "📰 Lịch sử tin đã post", callback_data: "history_news" }]],
         },
       };
-      await bot.sendMessage(chatId, text.trim(), replyMarkup);
+      const toSend = text.trim();
+      if (toSend.length <= MAX_EDIT_LEN) {
+        await bot.editMessageText(toSend, {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+          ...replyMarkup,
+        });
+      } else {
+        await bot.editMessageText(toSend.substring(0, MAX_EDIT_LEN - 50) + "\n\n... (đã cắt bớt)", {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+          ...replyMarkup,
+        });
+      }
     }
   } catch (err) {
-    await bot.sendMessage(chatId, `❌ Lỗi: ${err.message}`);
+    await bot.editMessageText(formatError(err, "database"), {
+      chat_id: chatId,
+      message_id: statusMsg.message_id,
+    });
   }
 }
 
