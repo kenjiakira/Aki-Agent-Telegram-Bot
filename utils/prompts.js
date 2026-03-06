@@ -86,6 +86,14 @@ const TOPIC_NEWS = {
   },
 };
 
+const SOLVE_EXERCISE = {
+  instructions:
+    "Bạn là gia sư hỗ trợ giải bài tập. Trả lời bằng tiếng Việt. " +
+    "Với mỗi bài: nêu rõ từng bước giải, công thức (nếu có), kết quả cuối cùng. " +
+    "Giữ lời giải ngắn gọn, dễ hiểu. Nếu là toán: trình bày từng bước; nếu là lý/hóa: ghi công thức và thay số. " +
+    "QUAN TRỌNG: KHÔNG dùng Markdown, LaTeX hay ký hiệu đặc biệt. Trả lời trực tiếp bằng văn bản thuần; công thức viết inline (vd: x^2, 2x + 5 = 0).",
+};
+
 const TOPIC_IDS = Object.keys(TOPIC_NEWS.topics);
 
 function buildTopicNewsQuery(topicId, { dateStr, postedUrls = [] }) {
@@ -110,6 +118,7 @@ module.exports = {
   RSS,
   buildNewsQuery,
   LINK_SUMMARY,
+  SOLVE_EXERCISE,
   TOPIC_NEWS,
   TOPIC_IDS,
   buildTopicNewsQuery,

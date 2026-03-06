@@ -9,6 +9,14 @@ const {
 } = require("./database");
 const { logMessage } = require("./messageLogger");
 
+/** Lấy URL file ảnh từ Telegram. Dùng khi lệnh cần vision (vd: solve). */
+async function getPhotoUrl(bot, fileId) {
+  const file = await bot.getFile(fileId);
+  const token = process.env.TELEGRAM_TOKEN;
+  if (!token) throw new Error("TELEGRAM_TOKEN chưa cấu hình");
+  return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+}
+
 function getConfig() {
   try {
     const p = path.join(__dirname, "../config.json");
@@ -88,7 +96,7 @@ function setupListen(bot) {
     logMessage(msg);
     const chatId = msg.chat.id;
     const userId = msg.from?.id;
-    const text = (msg.text || "").trim();
+    const text = (msg.text || msg.caption || "").trim();
 
     let permission = { allowed: true, isAdmin: false };
     if (userId) {
@@ -139,6 +147,14 @@ function setupListen(bot) {
           isAdmin: permission.isAdmin,
           pingStart: Date.now(),
         };
+        if (msg.photo && msg.photo.length > 0) {
+          const photo = msg.photo[msg.photo.length - 1];
+          try {
+            ctx.photoUrl = await getPhotoUrl(bot, photo.file_id);
+          } catch (e) {
+            ctx.photoUrl = null;
+          }
+        }
 
         try {
           await cmd.execute(bot, msg, ctx);
@@ -182,6 +198,14 @@ function setupListen(bot) {
             isAdmin: permission.isAdmin,
             pingStart: Date.now(),
           };
+          if (msg.photo && msg.photo.length > 0) {
+            const photo = msg.photo[msg.photo.length - 1];
+            try {
+              ctx.photoUrl = await getPhotoUrl(bot, photo.file_id);
+            } catch (e) {
+              ctx.photoUrl = null;
+            }
+          }
           try {
             await cmd.execute(bot, msg, ctx);
             await saveCommandHistory(userId, actualCmdName, text, true);
@@ -240,4 +264,4 @@ function setupListen(bot) {
   });
 }
 
-module.exports = { setupListen, getPermission, canUseCommand, loadCommands };
+module.exports = { setupListen, getPermission, canUseCommand, loadCommands, getPhotoUrl };
