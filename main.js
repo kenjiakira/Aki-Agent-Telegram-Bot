@@ -1,45 +1,50 @@
-require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
-const { setupListen } = require("./utils/listen");
-const { setupScheduler } = require("./utils/scheduler");
+/**
+ * Chạy bot: polling (dev) hoặc webhook (không chạy HTTP server).
+ * Dùng khi: npm run dev hoặc node main.js / node index.js
+ */
+const { createAppBot } = require("./core/bot");
+const { createLogger } = require("./utils/logger");
 
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
-
-setupListen(bot);
-setupScheduler(bot);
+const log = createLogger("Main");
 
 const USE_WEBHOOK = process.env.USE_WEBHOOK === "true";
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
-if (USE_WEBHOOK && WEBHOOK_URL) { 
-  console.log("🌐 Starting bot in WEBHOOK mode...");
-  
-  bot
+const bot = createAppBot();
+
+function startPolling() {
+  return bot.deleteWebHook().then(() => {
+    bot.startPolling();
+    log.ok("Polling đã bật — bot sẵn sàng nhận lệnh");
+  });
+}
+
+function startWebhook() {
+  if (!WEBHOOK_URL) {
+    log.warn("USE_WEBHOOK=true nhưng WEBHOOK_URL trống → chuyển sang polling");
+    return startPolling();
+  }
+  return bot
     .deleteWebHook()
+    .then(() => bot.setWebHook(WEBHOOK_URL))
     .then(() => {
-      return bot.setWebHook(WEBHOOK_URL);
-    })
-    .then(() => {
-      console.log(`✅ Webhook set to: ${WEBHOOK_URL}`);
-      console.log("Bot is running (webhook mode)...");
+      log.ok("Webhook đã set:", WEBHOOK_URL);
+      log.log("Bot nhận update qua webhook (không polling).");
     })
     .catch((err) => {
-      console.error("Webhook error:", err.message); 
-      bot.startPolling();
-      console.log("⚠️ Fallback to polling mode...");
+      log.error("Webhook lỗi:", err.message);
+      log.warn("Fallback: bật polling");
+      return startPolling();
     });
+}
+
+if (USE_WEBHOOK && WEBHOOK_URL) {
+  log.info("Khởi động chế độ webhook...");
+  startWebhook();
 } else {
-  console.log("🔧 Starting bot in POLLING mode (dev)...");
-  
-  bot
-    .deleteWebHook()
-    .then(() => {
-      bot.startPolling();
-      console.log("Bot is running (polling)...");
-    })
-    .catch((err) => {
-      console.error("Webhook:", err.message);
-      bot.startPolling();
-      console.log("Bot is running (polling)...");
-    });
+  log.info("Khởi động chế độ polling (dev)...");
+  bot.deleteWebHook().then(() => startPolling()).catch((err) => {
+    log.warn("deleteWebHook:", err.message);
+    startPolling();
+  });
 }

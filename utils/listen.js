@@ -7,6 +7,7 @@ const {
   upsertBotUser,
   getPermission,
 } = require("./database");
+const { logMessage } = require("./messageLogger");
 
 function getConfig() {
   try {
@@ -84,6 +85,7 @@ function setupListen(bot) {
   const rePrefixOnly = new RegExp("^" + prefixEscaped + "\\s*$");
 
   bot.on("message", async (msg) => {
+    logMessage(msg);
     const chatId = msg.chat.id;
     const userId = msg.from?.id;
     const text = (msg.text || "").trim();

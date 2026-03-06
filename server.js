@@ -1,21 +1,26 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
-const TelegramBot = require("node-telegram-bot-api");
-const { setupListen } = require("./utils/listen");
-const { setupScheduler } = require("./utils/scheduler");
+const { createAppBot } = require("./core/bot");
+const { createLogger, printBanner } = require("./utils/logger");
 
+let name = "bot-tele", version = "1.0.0";
+try {
+  const pkg = require(path.join(__dirname, "package.json"));
+  if (pkg.name) name = pkg.name;
+  if (pkg.version) version = pkg.version;
+} catch {}
+printBanner(name, version, "server");
+
+const log = createLogger("Server");
+const bot = createAppBot();
 const app = express();
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
-
 app.use(express.json());
-
-setupListen(bot);
-setupScheduler(bot);
 
 app.post("/webhook", (req, res) => {
   const body = req.body;
   if (!body || Object.keys(body).length === 0) {
-    console.warn("[webhook] Empty body");
+    log.warn("POST /webhook — body rỗng");
     return res.sendStatus(400);
   }
   res.sendStatus(200);
@@ -23,7 +28,7 @@ app.post("/webhook", (req, res) => {
     try {
       bot.processUpdate(body);
     } catch (err) {
-      console.error("[webhook] processUpdate error:", err.message);
+      log.error("processUpdate:", err.message);
     }
   });
 });
@@ -33,23 +38,22 @@ app.get("/health", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const webhookUrl = process.env.WEBHOOK_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook` : null);
 
 bot
   .deleteWebHook()
-  .then(() => {
-    const webhookUrl = process.env.WEBHOOK_URL || `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook`;
-    return bot.setWebHook(webhookUrl).then(() => webhookUrl);
-  })
-  .then((webhookUrl) => {
-    console.log("✅ Webhook configured:", webhookUrl);
+  .then(() => (webhookUrl ? bot.setWebHook(webhookUrl).then(() => webhookUrl) : null))
+  .then((url) => {
+    if (url) log.ok("Webhook:", url);
+    else log.warn("WEBHOOK_URL chưa set — Telegram chưa gửi update tới server.");
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log("🌐 Lệnh bot nhận qua POST /webhook — đảm bảo Start Command là: node server.js");
+      log.ok("HTTP đang chạy port", PORT);
+      log.log("Endpoints: POST /webhook, GET /health");
     });
   })
   .catch((err) => {
-    console.error("Webhook setup error:", err.message);
+    log.error("Webhook setup:", err.message);
     app.listen(PORT, () => {
-      console.log(`⚠️ Server running without webhook on port ${PORT}`);
+      log.warn("HTTP chạy port", PORT, "(webhook chưa cấu hình)");
     });
   });
