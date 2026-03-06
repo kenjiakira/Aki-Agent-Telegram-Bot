@@ -15,6 +15,11 @@ const config = {
   useBy: 1,
   category: "admin",
   callbacks: ["schedule_list", "schedule_refresh", "schedule_help", "schedule_add", "schedule_delete_"],
+  usage:
+    "• /schedule list — xem lịch hiện tại\n" +
+    "• /schedule add daily 08:00 /post ai — hằng ngày 8:00 post tin chủ đề AI (có thể đổi: crypto, tech, world)\n" +
+    "• /schedule add weekly 09:00 0 /post — Chủ nhật 9:00\n" +
+    "• /schedule remove <id> — xóa lịch",
 };
 
 const activeJobs = new Map();

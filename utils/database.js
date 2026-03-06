@@ -426,6 +426,50 @@ async function getPermission(telegramId) {
   };
 }
 
+async function addAutoNewsSubscriber(telegramId) {
+  const { error } = await supabase
+    .from("auto_news_subscribers")
+    .upsert({ telegram_id: String(telegramId) }, { onConflict: "telegram_id" });
+  if (error) throw error;
+}
+
+async function removeAutoNewsSubscriber(telegramId) {
+  const { error } = await supabase
+    .from("auto_news_subscribers")
+    .delete()
+    .eq("telegram_id", String(telegramId));
+  if (error) throw error;
+}
+
+async function isAutoNewsSubscriber(telegramId) {
+  const { data, error } = await supabase
+    .from("auto_news_subscribers")
+    .select("telegram_id")
+    .eq("telegram_id", String(telegramId))
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+async function getAutoNewsSubscriberIds() {
+  const { data: subs, error: subError } = await supabase
+    .from("auto_news_subscribers")
+    .select("telegram_id");
+  if (subError) throw subError;
+  if (!subs?.length) return [];
+
+  const ids = subs.map((r) => r.telegram_id);
+  const { data: users, error: userError } = await supabase
+    .from("bot_users")
+    .select("telegram_id")
+    .in("telegram_id", ids)
+    .eq("allowed", true);
+  if (userError) throw userError;
+
+  const allowedSet = new Set((users || []).map((u) => String(u.telegram_id)));
+  return ids.filter((id) => allowedSet.has(String(id)));
+}
+
 module.exports = {
   isAlreadyPosted,
   savePostedNews,
@@ -447,4 +491,8 @@ module.exports = {
   updateBotUser,
   getBotUsers,
   getPermission,
+  addAutoNewsSubscriber,
+  removeAutoNewsSubscriber,
+  isAutoNewsSubscriber,
+  getAutoNewsSubscriberIds,
 };

@@ -1,3 +1,5 @@
+const path = require("path");
+const fs = require("fs");
 const { loadCommands } = require("./commands");
 const { parseCommand } = require("./commandParser");
 const {
@@ -5,6 +7,30 @@ const {
   upsertBotUser,
   getPermission,
 } = require("./database");
+
+function getConfig() {
+  try {
+    const p = path.join(__dirname, "../config.json");
+    const raw = fs.readFileSync(p, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function getPrefix() {
+  const cfg = getConfig();
+  return typeof cfg.prefix === "string" && cfg.prefix.length > 0 ? cfg.prefix : "/";
+}
+
+function getMtnMode() {
+  const cfg = getConfig();
+  return cfg.mtnMode === true;
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function canUseCommand(cmd, isAdmin) {
   const useBy = cmd.config?.useBy ?? 0;
@@ -29,6 +55,10 @@ function findCallbackHandler(commands, data) {
 
 function setupListen(bot) {
   const { commands, aliases } = loadCommands();
+  const prefix = getPrefix();
+  const prefixEscaped = escapeRegex(prefix);
+  const reCommand = new RegExp("^" + prefixEscaped + "(\\w+)");
+  const rePrefixOnly = new RegExp("^" + prefixEscaped + "\\s*$");
 
   bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
@@ -52,9 +82,14 @@ function setupListen(bot) {
         return;
       }
     }
+    if (getMtnMode() && !permission.isAdmin) {
+      bot.sendMessage(chatId, "🔧 Bot đang bảo trì, chỉ admin có thể sử dụng.");
+      return;
+    }
 
-    const match = text.match(/^\/(\w+)/);
-    const cmdName = match ? match[1].toLowerCase() : null;
+    const match = text.match(reCommand);
+    let cmdName = match ? match[1].toLowerCase() : null;
+    if (!cmdName && rePrefixOnly.test(text)) cmdName = "help";
 
     if (cmdName) {
       const actualCmdName = aliases[cmdName] || cmdName;
@@ -66,7 +101,7 @@ function setupListen(bot) {
           return;
         }
 
-        const parsed = parseCommand(text);
+        const parsed = parseCommand(text, prefix);
         const ctx = {
           commands,
           parsed,
@@ -85,10 +120,10 @@ function setupListen(bot) {
       } else {
         const notfoundCmd = commands["notfound"];
         if (notfoundCmd) {
-          const ctx = { commands, parsed: parseCommand(text), aliases, isAdmin: permission.isAdmin };
+          const ctx = { commands, parsed: parseCommand(text, prefix), aliases, isAdmin: permission.isAdmin };
           notfoundCmd.execute(bot, msg, ctx);
         } else {
-          bot.sendMessage(chatId, `❓ Lệnh /${cmdName} không tồn tại. Gõ /help để xem danh sách lệnh.`);
+          bot.sendMessage(chatId, `❓ Lệnh ${prefix}${cmdName} không tồn tại. Gõ ${prefix}help để xem danh sách lệnh.`);
         }
       }
       return;
@@ -104,7 +139,7 @@ function setupListen(bot) {
             bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
             return;
           }
-          const parsed = parseCommand("/" + text);
+          const parsed = parseCommand(prefix + text, prefix);
           const ctx = {
             commands,
             parsed,
@@ -146,6 +181,10 @@ function setupListen(bot) {
       const permission = await getPermission(userId);
       if (!permission.allowed) {
         await bot.answerCallbackQuery(query.id, { text: "⛔ Bạn không có quyền." });
+        return;
+      }
+      if (getMtnMode() && !permission.isAdmin) {
+        await bot.answerCallbackQuery(query.id, { text: "🔧 Bot đang bảo trì." });
         return;
       }
       const ctx = { commands, parsed: {}, aliases, isAdmin: permission.isAdmin };

@@ -1,102 +1,137 @@
-const OpenAI = require("openai");
+const { getModel, createResponse } = require("../lib/openai");
 const {
   isAlreadyPosted,
   savePostedNews,
   getPostedUrls,
   extractUrls,
+  getAutoNewsSubscriberIds,
 } = require("./database");
 const { formatDateVN } = require("./time");
+const {
+  RSS,
+  TOPIC_NEWS,
+  TOPIC_IDS,
+  buildTopicNewsQuery,
+} = require("./prompts");
 
-const MODEL = process.env.OPENAI_NEWS_MODEL;
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+async function fetchNewsByTopic(topicId, opts = {}) {
+  const topic = TOPIC_NEWS.topics[topicId];
+  if (!topic) return null;
 
-function buildQuery(postedUrls = []) {
-  const dateStr = formatDateVN(new Date());
-
-  let query = `Tin tức công nghệ AI và software mới nhất ngày ${dateStr}. `;
-  query += `Liệt kê 5 tin quan trọng, mỗi tin có: tiêu đề, tóm tắt ngắn 1-2 câu, link nguồn. `;
-  query += `Trả lời bằng tiếng Việt, dùng markdown, cite sources với [Tên](url). Giữ ngắn gọn, hấp dẫn.`;
-
-  if (postedUrls.length > 0) {
-    query += `\n\nQUAN TRỌNG: Không chọn các tin đã được đăng trước đó. `;
-    query += `Danh sách URLs đã đăng (tránh chọn lại):\n`;
-    query += postedUrls.slice(0, 20).join("\n");
-    if (postedUrls.length > 20) {
-      query += `\n... và ${postedUrls.length - 20} URLs khác.`;
+  let postedUrls = opts.postedUrls;
+  if (postedUrls === undefined) {
+    try {
+      postedUrls = await getPostedUrls(50);
+    } catch (err) {
+      console.warn("⚠️ Không lấy được danh sách URLs đã post:", err.message);
+      postedUrls = [];
     }
-    query += `\nChỉ chọn tin MỚI chưa được đăng.`;
   }
 
-  return query;
-}
+  const dateStr = formatDateVN(new Date());
+  const query = buildTopicNewsQuery(topicId, { dateStr, postedUrls });
+  if (!query) return null;
 
-async function fetchNews() {  
-  let postedUrls = [];
-  try {
-    postedUrls = await getPostedUrls(50); 
-  } catch (err) {
-    console.warn("⚠️ Không lấy được danh sách URLs đã post:", err.message);
-  }
-
-  const query = buildQuery(postedUrls);
-
-  const response = await openai.responses.create({
-    model: MODEL,
+  const raw = await createResponse({
+    model: getModel(),
+    instructions: TOPIC_NEWS.instructions,
     input: [{ role: "user", content: query }],
     tools: [{ type: "web_search" }],
-    instructions:
-      "Bạn là trợ lý tổng hợp tin tức. Trả lời bằng markdown, cite nguồn với [Tên](url). Ngắn gọn, chính xác. QUAN TRỌNG: Chỉ chọn tin MỚI chưa được đăng trước đó, tránh các URLs đã được liệt kê.",
   });
 
-  const raw =
-    response?.output_text ??
-    (response?.output ?? [])
-      ?.map((item) =>
-        (item?.content ?? [])
-          .map((c) => c?.text ?? c?.content ?? "")
-          .join("")
-      )
-      .join("") ??
-    "";
-
-  return raw;
+  return raw.trim();
 }
 
-async function postNews(bot, force = false) {
-  const channelId = process.env.CHANNEL_ID;
-  if (!channelId) throw new Error("CHANNEL_ID chưa cấu hình trong .env");
 
-  const content = await fetchNews();
-  if (!content.trim()) throw new Error("Không lấy được nội dung tin");
+async function postNewsByTopic(bot, topicId, force = false, targetChatId = null) {
+  const chatId = targetChatId || process.env.CHANNEL_ID;
+  if (!chatId) throw new Error("CHANNEL_ID hoặc targetChatId chưa được cấu hình");
+  if (!TOPIC_NEWS.topics[topicId]) throw new Error(`Chủ đề không hợp lệ: ${topicId}. Dùng: ${TOPIC_IDS.join(", ")}`);
+
+  const content = await fetchNewsByTopic(topicId);
+  if (!content || !content.trim()) throw new Error("Không lấy được nội dung tin");
 
   const urls = extractUrls(content);
-  console.log(`📰 Tìm thấy ${urls.length} URLs trong tin:`, urls);
+  console.log(`📰 [${topicId}] Tìm thấy ${urls.length} URLs trong tin.`);
 
   const isDuplicate = await isAlreadyPosted(content);
   if (!force && isDuplicate) {
-    console.log("⚠️ Tin trùng — tự động force post.");
+    console.log("⚠️ Tin trùng — bỏ qua (dùng force để post lại).");
+    return;
   }
 
-  const header = "🤖 Tin AI & Tech mới nhất\n\n";
+  const header = TOPIC_NEWS.topics[topicId].newsHeader;
   const message = header + content.trim();
   const maxLen = 4000;
 
   if (message.length <= maxLen) {
-    await bot.sendMessage(channelId, message, { parse_mode: "Markdown" });
+    await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
   } else {
-    const parts = [];
     let remaining = message;
     while (remaining.length > 0) {
-      parts.push(remaining.slice(0, maxLen));
+      const part = remaining.slice(0, maxLen);
       remaining = remaining.slice(maxLen);
-    }
-    for (const part of parts) {
-      await bot.sendMessage(channelId, part, { parse_mode: "Markdown" });
+      await bot.sendMessage(chatId, part, { parse_mode: "Markdown" });
     }
   }
 
   await savePostedNews(content);
-  console.log(`✅ Đã lưu tin vào database với ${urls.length} URLs.`);
+  console.log(`✅ Đã lưu tin [${topicId}] vào database với ${urls.length} URLs.`);
 }
 
-module.exports = { postNews, fetchNews };
+async function postNews(bot, force = false) {
+  const topicId = process.env.AUTO_NEWS_TOPIC || "ai";
+  await postNewsByTopic(bot, topicId, force);
+}
+
+
+async function sendAutoNewsToSubscribers(bot, topicId) {
+  if (!TOPIC_NEWS.topics[topicId]) throw new Error(`Chủ đề không hợp lệ: ${topicId}. Dùng: ${TOPIC_IDS.join(", ")}`);
+
+  const content = await fetchNewsByTopic(topicId);
+  if (!content || !content.trim()) throw new Error("Không lấy được nội dung tin");
+
+  const urls = extractUrls(content);
+  console.log(`📰 [${topicId}] Tìm thấy ${urls.length} URLs trong tin.`);
+
+  const isDuplicate = await isAlreadyPosted(content);
+  if (isDuplicate) {
+    console.log("⚠️ Tin trùng — bỏ qua gửi tin tự động.");
+    return;
+  }
+
+  const header = TOPIC_NEWS.topics[topicId].newsHeader;
+  const message = header + content.trim();
+  const maxLen = 4000;
+  const parts = [];
+  let remaining = message;
+  while (remaining.length > 0) {
+    parts.push(remaining.slice(0, maxLen));
+    remaining = remaining.slice(maxLen);
+  }
+
+  let chatIds = await getAutoNewsSubscriberIds();
+  if (chatIds.length === 0) {
+    const fallback = process.env.AUTO_NEWS_CHAT_ID || process.env.CHANNEL_ID;
+    if (fallback) chatIds = [fallback];
+  }
+  if (chatIds.length === 0) {
+    console.log("⚠️ Không có subscriber tin tự động và không cấu hình AUTO_NEWS_CHAT_ID/CHANNEL_ID — bỏ qua.");
+    return;
+  }
+
+  for (const chatId of chatIds) {
+    try {
+      for (const part of parts) {
+        await bot.sendMessage(chatId, part, { parse_mode: "Markdown" });
+      }
+    } catch (err) {
+      console.warn(`⚠️ Không gửi được tin tự động tới ${chatId}:`, err.message);
+    }
+  }
+
+  await savePostedNews(content);
+  console.log(`✅ Đã gửi tin [${topicId}] tới ${chatIds.length} chat(s), lưu DB.`);
+}
+
+module.exports = { postNews, postNewsByTopic, fetchNewsByTopic, sendAutoNewsToSubscribers };

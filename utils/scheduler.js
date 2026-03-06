@@ -1,16 +1,18 @@
 const cron = require("node-cron");
-const { postNews } = require("./rss");
+const { sendAutoNewsToSubscribers } = require("./rss");
 const { cleanupOldNews } = require("./database");
 const { loadScheduledCommands } = require("../commands/schedule");
+
+const AUTO_TOPIC = process.env.AUTO_NEWS_TOPIC || "ai";
 
 function setupScheduler(bot) {
 
   cron.schedule("0 8 * * *", async () => {
-    console.log("Posting AI news...");
+    console.log(`Posting auto news (topic: ${AUTO_TOPIC}) to subscribers...`);
     try {
-      await postNews(bot);
+      await sendAutoNewsToSubscribers(bot, AUTO_TOPIC);
     } catch (err) {
-      console.error("Error posting news:", err.message);
+      console.error("Error posting auto news:", err.message);
     }
   });
 

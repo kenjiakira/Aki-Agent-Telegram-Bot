@@ -9,6 +9,10 @@ const config = {
   useBy: 0,
   category: "general",
   callbacks: ["history_news", "history_commands"],
+  usage:
+    "• /history — mặc định: lịch sử commands\n" +
+    "• /history --type=news — lịch sử tin đã post\n" +
+    "• /history --limit=20 — số dòng (mặc định 10)",
 };
 
 const MAX_EDIT_LEN = 4000;

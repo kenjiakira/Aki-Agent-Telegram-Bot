@@ -6,6 +6,16 @@ const config = {
   callbacks: ["help", "help_ok", "help_section_"],
 };
 
+function formatCommandLine(cmd) {
+  if (!cmd?.config?.name) return "";
+  let line = `/${cmd.config.name}`;
+  if (cmd.config.aliases?.length) {
+    line += ` (${cmd.config.aliases.map((a) => `/${a}`).join(", ")})`;
+  }
+  line += ` — ${cmd.config.description}`;
+  return line;
+}
+
 function getFullHelpText(commands) {
   const byCategory = {};
   for (const cmd of Object.values(commands || {})) {
@@ -22,16 +32,21 @@ function getFullHelpText(commands) {
     const label = cat === "admin" ? "🔐 Admin" : cat === "general" ? "📋 Chung" : "📁 Khác";
     text += `${label}\n`;
     for (const cmd of byCategory[cat]) {
-      let cmdLine = `/${cmd.config.name}`;
-      if (cmd.config.aliases?.length) {
-        cmdLine += ` (${cmd.config.aliases.map((a) => `/${a}`).join(", ")})`;
-      }
-      cmdLine += ` - ${cmd.config.description}`;
-      text += `${cmdLine}\n`;
+      text += formatCommandLine(cmd) + "\n";
     }
     text += "\n";
   }
   return text.trim();
+}
+
+function getCategoryHelpText(commands, category) {
+  const list = [];
+  for (const cmd of Object.values(commands || {})) {
+    if (cmd.config?.hide) continue;
+    if ((cmd.config?.category || "other") !== category) continue;
+    list.push(formatCommandLine(cmd));
+  }
+  return list.join("\n");
 }
 
 function getHelpInlineKeyboard(commands, isAdminUser) {
@@ -58,44 +73,41 @@ function execute(bot, msg, ctx) {
 
   const shortText =
     "📖 Hướng dẫn\n\n" +
-    "Bot tự động đăng tin AI news lên channel mỗi ngày lúc 8:00.\n\n" +
+    "Bắt đầu: Gõ /start để xem từng bước và đăng ký nhận tin tự động mỗi ngày 8:00 (vào tin nhắn riêng).\n\n" +
     "Chọn nút bên dưới để xem nhanh từng phần:";
 
   const keyboard = getHelpInlineKeyboard(commands, isAdminUser);
   bot.sendMessage(chatId, shortText, keyboard);
 }
 
-/** Nội dung từng section (dùng khi bấm nút inline từ /help) */
+const SECTION_META = {
+  history: { title: "📜 Lịch sử", commandName: "history" },
+  schedule: { title: "📅 Lịch", commandName: "schedule" },
+  stats: { title: "📊 Thống kê", commandName: "stats" },
+  commands: { title: null, commandName: null },
+  admin: { title: "🔐 Admin", commandName: null },
+};
+
 function getSectionMessage(section, commands) {
-  const messages = {
-    history:
-      "📜 Lịch sử\n\n" +
-      "/history — Xem lịch sử lệnh đã chạy hoặc tin đã post.\n" +
-      "• /history — mặc định: lịch sử commands\n" +
-      "• /history --type=news — lịch sử tin đã post\n" +
-      "• /history --limit=20 — số dòng (mặc định 10)",
-    schedule:
-      "📅 Lịch\n\n" +
-      "/schedule — Lên lịch chạy command tự động (chỉ admin).\n" +
-      "• /schedule list — xem lịch hiện tại\n" +
-      "• /schedule add daily 08:00 /post — hằng ngày lúc 8:00 chạy /post\n" +
-      "• /schedule add weekly 09:00 0 /post — Chủ nhật 9:00\n" +
-      "• /schedule remove <id> — xóa lịch",
-    commands: getFullHelpText(commands),
-    stats:
-      "📊 Thống kê\n\n" +
-      "/stats — Xem thống kê số lượng tin đã post (chỉ admin).",
-    admin:
-      "🔐 Admin\n\n" +
-      "Lệnh chỉ dành cho admin:\n" +
-      "/schedule — lên lịch\n" +
-      "/post — gửi tin ngay\n" +
-      "/stats — thống kê\n" +
-      "/admins — danh sách admin\n" +
-      "/status — trạng thái bot & DB\n" +
-      "/cleanup [ngày] — xóa tin cũ (mặc định 30 ngày)",
-  };
-  return messages[section] || null;
+  const meta = SECTION_META[section];
+  if (!meta) return null;
+
+  if (section === "commands") return getFullHelpText(commands);
+
+  if (meta.commandName) {
+    const cmd = commands?.[meta.commandName];
+    if (!cmd?.config) return null;
+    let text = `${meta.title}\n\n${formatCommandLine(cmd)}`;
+    if (cmd.config.usage) text += "\n\n" + cmd.config.usage;
+    return text;
+  }
+
+  if (section === "admin") {
+    const body = getCategoryHelpText(commands, "admin");
+    return body ? `${meta.title}\n\nLệnh chỉ dành cho admin:\n${body}` : null;
+  }
+
+  return null;
 }
 
 async function handleCallback(bot, query, ctx) {

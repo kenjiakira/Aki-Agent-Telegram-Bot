@@ -1,11 +1,16 @@
 
-function parseCommand(text) {
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseCommand(text, prefix = "/") {
   const trimmed = text.trim();
-  const cmdMatch = trimmed.match(/^\/(\w+)/);
+  const re = new RegExp("^" + escapeRegex(prefix) + "(\\w+)");
+  const cmdMatch = trimmed.match(re);
   if (!cmdMatch) {
     return null;
   }
-  
+
   const commandName = cmdMatch[1].toLowerCase();
   const rest = trimmed.substring(cmdMatch[0].length).trim();
   
