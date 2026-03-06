@@ -45,10 +45,23 @@ const config = {
   callbacks: ["start_sub", "start_unsub"],
 };
 
+function isGroup(chat) {
+  return chat && (chat.type === "group" || chat.type === "supergroup");
+}
+
 async function execute(bot, msg, ctx) {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   const name = (ctx?.parsed?.name || "").toLowerCase();
+
+  if (isGroup(msg.chat)) {
+    await bot.sendMessage(
+      chatId,
+      "👋 Trong group gõ /news để xem tin theo chủ đề và **đăng ký** (hoặc **hủy**) nhận tin tự động mỗi ngày 8:00. Mỗi group chỉ đăng ký một lần.",
+      { parse_mode: "Markdown" }
+    );
+    return;
+  }
 
   if (name === "unsubscribenews" || name === "huydongbo") {
     if (!userId) {

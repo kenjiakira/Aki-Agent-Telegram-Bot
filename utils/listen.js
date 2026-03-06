@@ -32,10 +32,33 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function canUseCommand(cmd, isAdmin) {
+function isGroupChat(chat) {
+  return chat && (chat.type === "group" || chat.type === "supergroup");
+}
+
+async function isGroupOwnerOrAdmin(bot, chatId, userId) {
+  if (!chatId || !userId) return false;
+  try {
+    const admins = await bot.getChatAdministrators(chatId);
+    return admins.some(
+      (m) => String(m.user.id) === String(userId) && (m.status === "creator" || m.status === "administrator")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function canUseCommand(bot, cmd, permission, msg) {
   const useBy = cmd.config?.useBy ?? 0;
   if (useBy === 0) return true;
-  if (useBy === 1) return isAdmin;
+  if (useBy === 1) return permission.isAdmin;
+  if (useBy === 2) {
+    if (permission.isAdmin) return true;
+    if (isGroupChat(msg.chat)) {
+      return await isGroupOwnerOrAdmin(bot, msg.chat.id, msg.from?.id);
+    }
+    return false;
+  }
   return false;
 }
 
@@ -96,8 +119,13 @@ function setupListen(bot) {
       const cmd = commands[actualCmdName];
 
       if (cmd) {
-        if (!canUseCommand(cmd, permission.isAdmin)) {
-          bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
+        const allowed = await canUseCommand(bot, cmd, permission, msg);
+        if (!allowed) {
+          const useBy = cmd.config?.useBy ?? 0;
+          const hint = useBy === 2
+            ? "⛔ Chỉ admin bot hoặc chủ nhóm/admin nhóm mới dùng được lệnh này."
+            : "⛔ Chỉ admin mới dùng được lệnh này.";
+          bot.sendMessage(chatId, hint);
           return;
         }
 
@@ -135,8 +163,13 @@ function setupListen(bot) {
         const actualCmdName = aliases[firstWord] || firstWord;
         const cmd = commands[actualCmdName];
         if (cmd && cmd.config?.usePrefix === false) {
-          if (!canUseCommand(cmd, permission.isAdmin)) {
-            bot.sendMessage(chatId, "⛔ Chỉ admin mới dùng được lệnh này.");
+          const allowed = await canUseCommand(bot, cmd, permission, msg);
+          if (!allowed) {
+            const useBy = cmd.config?.useBy ?? 0;
+            const hint = useBy === 2
+              ? "⛔ Chỉ admin bot hoặc chủ nhóm/admin nhóm mới dùng được lệnh này."
+              : "⛔ Chỉ admin mới dùng được lệnh này.";
+            bot.sendMessage(chatId, hint);
             return;
           }
           const parsed = parseCommand(prefix + text, prefix);
@@ -190,6 +223,15 @@ function setupListen(bot) {
       const ctx = { commands, parsed: {}, aliases, isAdmin: permission.isAdmin };
       const handler = findCallbackHandler(commands, data);
       if (handler) {
+        const fakeMsg = { chat: query.message.chat, from: query.from };
+        const allowed = await canUseCommand(bot, handler, permission, fakeMsg);
+        if (!allowed) {
+          const useBy = handler.config?.useBy ?? 0;
+          await bot.answerCallbackQuery(query.id, {
+            text: useBy === 2 ? "⛔ Chỉ admin bot hoặc chủ nhóm/admin nhóm." : "⛔ Chỉ admin.",
+          });
+          return;
+        }
         await handler.handleCallback(bot, query, ctx);
       }
     }

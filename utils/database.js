@@ -470,6 +470,45 @@ async function getAutoNewsSubscriberIds() {
   return ids.filter((id) => allowedSet.has(String(id)));
 }
 
+async function addAutoNewsGroup(chatId, title = null) {
+  const id = String(chatId);
+  const { error } = await supabase.from("auto_news_group_subscribers").insert({
+    chat_id: id,
+    title: title || null,
+  });
+  if (error) {
+    if (error.code === "23505") return false; 
+    throw error;
+  }
+  return true;
+}
+
+async function removeAutoNewsGroup(chatId) {
+  const { error } = await supabase
+    .from("auto_news_group_subscribers")
+    .delete()
+    .eq("chat_id", String(chatId));
+  if (error) throw error;
+}
+
+async function isAutoNewsGroupSubscribed(chatId) {
+  const { data, error } = await supabase
+    .from("auto_news_group_subscribers")
+    .select("chat_id")
+    .eq("chat_id", String(chatId))
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+async function getAutoNewsGroupChatIds() {
+  const { data, error } = await supabase
+    .from("auto_news_group_subscribers")
+    .select("chat_id");
+  if (error) throw error;
+  return (data || []).map((r) => r.chat_id);
+}
+
 module.exports = {
   isAlreadyPosted,
   savePostedNews,
@@ -495,4 +534,8 @@ module.exports = {
   removeAutoNewsSubscriber,
   isAutoNewsSubscriber,
   getAutoNewsSubscriberIds,
+  addAutoNewsGroup,
+  removeAutoNewsGroup,
+  isAutoNewsGroupSubscribed,
+  getAutoNewsGroupChatIds,
 };

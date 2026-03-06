@@ -68,11 +68,19 @@ function execute(bot, msg, ctx) {
   const chatId = msg.chat.id;
   const commands = ctx?.commands || {};
   const isAdminUser = !!ctx?.isAdmin;
+  const firstArg = (ctx?.parsed?.args?.[0] || "").toLowerCase();
+
+  if (firstArg === "all") {
+    const text = getFullHelpText(commands, isAdminUser);
+    bot.sendMessage(chatId, "📖 Tất cả lệnh trong hệ thống\n\n" + text);
+    return;
+  }
 
   const shortText =
     "📖 Hướng dẫn\n\n" +
     "Bắt đầu: Gõ /start để xem từng bước và đăng ký nhận tin tự động mỗi ngày 8:00 (vào tin nhắn riêng).\n\n" +
-    "Chọn nút bên dưới để xem nhanh từng phần:";
+    "Chọn nút bên dưới để xem nhanh từng phần:\n\n" +
+    "💡 Gõ /help all để xem danh sách tất cả lệnh.";
 
   const keyboard = getHelpInlineKeyboard(commands, isAdminUser);
   bot.sendMessage(chatId, shortText, keyboard);

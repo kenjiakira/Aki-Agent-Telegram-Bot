@@ -5,6 +5,7 @@ const {
   getPostedUrls,
   extractUrls,
   getAutoNewsSubscriberIds,
+  getAutoNewsGroupChatIds,
 } = require("./database");
 const { formatDateVN } = require("./time");
 const {
@@ -110,7 +111,11 @@ async function sendAutoNewsToSubscribers(bot, topicId) {
     remaining = remaining.slice(maxLen);
   }
 
-  let chatIds = await getAutoNewsSubscriberIds();
+  const [userChatIds, groupChatIds] = await Promise.all([
+    getAutoNewsSubscriberIds(),
+    getAutoNewsGroupChatIds(),
+  ]);
+  let chatIds = [...userChatIds, ...groupChatIds];
   if (chatIds.length === 0) {
     const fallback = process.env.AUTO_NEWS_CHAT_ID || process.env.CHANNEL_ID;
     if (fallback) chatIds = [fallback];
