@@ -4,7 +4,7 @@ const config = {
   name: "uptime",
   description: "Xem thông tin hệ thống: uptime, RAM, CPU",
   useBy: 1,
-  usePrefix: true,
+  usePrefix: false,
   category: "admin",
 };
 

@@ -5,6 +5,7 @@ const config = {
   description: "Kiểm tra thời gian phản hồi của bot",
   useBy: 0,
   category: "general",
+  usePrefix: false,
 };
 
 function execute(bot, msg, ctx) {
