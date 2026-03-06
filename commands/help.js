@@ -9,17 +9,15 @@ const config = {
 function formatCommandLine(cmd) {
   if (!cmd?.config?.name) return "";
   let line = `/${cmd.config.name}`;
-  if (cmd.config.aliases?.length) {
-    line += ` (${cmd.config.aliases.map((a) => `/${a}`).join(", ")})`;
-  }
   line += ` — ${cmd.config.description}`;
   return line;
 }
 
-function getFullHelpText(commands) {
+function getFullHelpText(commands, isAdminUser) {
   const byCategory = {};
   for (const cmd of Object.values(commands || {})) {
     if (cmd.config?.hide) continue;
+    if (!isAdminUser && (cmd.config?.category || "other") === "admin") continue;
     const cat = cmd.config?.category || "other";
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(cmd);
@@ -88,11 +86,12 @@ const SECTION_META = {
   admin: { title: "🔐 Admin", commandName: null },
 };
 
-function getSectionMessage(section, commands) {
+function getSectionMessage(section, commands, isAdminUser) {
   const meta = SECTION_META[section];
   if (!meta) return null;
+  if (section === "admin" && !isAdminUser) return null;
 
-  if (section === "commands") return getFullHelpText(commands);
+  if (section === "commands") return getFullHelpText(commands, isAdminUser);
 
   if (meta.commandName) {
     const cmd = commands?.[meta.commandName];
@@ -126,7 +125,8 @@ async function handleCallback(bot, query, ctx) {
 
   if (data.startsWith("help_section_")) {
     const section = data.replace("help_section_", "");
-    const text = getSectionMessage(section, commands);
+    const isAdminUser = !!ctx?.isAdmin;
+    const text = getSectionMessage(section, commands, isAdminUser);
     if (text) await bot.sendMessage(chatId, text);
   }
 }

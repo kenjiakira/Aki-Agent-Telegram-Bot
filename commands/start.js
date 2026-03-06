@@ -42,7 +42,6 @@ const config = {
   description: "Bắt đầu — hướng dẫn từng bước & đăng ký nhận tin tự động",
   useBy: 0,
   category: "general",
-  aliases: ["unsubscribenews", "huydongbo"],
   callbacks: ["start_sub", "start_unsub"],
 };
 

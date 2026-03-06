@@ -3,8 +3,9 @@ const os = require("os");
 const config = {
   name: "uptime",
   description: "Xem thông tin hệ thống: uptime, RAM, CPU",
-  useBy: 0,
-  category: "general",
+  useBy: 1,
+  usePrefix: true,
+  category: "admin",
 };
 
 function formatBytes(bytes) {
