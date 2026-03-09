@@ -27,8 +27,8 @@ async function handleMessage(bot, msg) {
 
   const validation = runValidateUrl(url);
   if (!validation.valid) {
-    await bot.sendMessage(msg.chat.id, "⚠️ " + validation.reason);
-    return true;
+    if (validation.reason) await bot.sendMessage(msg.chat.id, "⚠️ " + validation.reason);
+    return !!validation.reason;
   }
 
   const chatId = msg.chat.id;

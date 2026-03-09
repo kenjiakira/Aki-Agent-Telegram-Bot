@@ -8,6 +8,41 @@ const BLOCKED_HOSTS = [
   "0.0.0.1",
 ];
 
+const SOCIAL_VIDEO_HOSTS = [
+  "tiktok.com",
+  "vm.tiktok.com",
+  "vt.tiktok.com",
+  "www.tiktok.com",
+  "youtube.com",
+  "www.youtube.com",
+  "youtu.be",
+  "m.youtube.com",
+  "facebook.com",
+  "www.facebook.com",
+  "fb.watch",
+  "fb.com",
+  "m.facebook.com",
+  "instagram.com",
+  "www.instagram.com",
+  "twitter.com",
+  "www.twitter.com",
+  "x.com",
+  "twitch.tv",
+  "www.twitch.tv",
+  "vimeo.com",
+  "www.vimeo.com",
+  "dailymotion.com",
+  "www.dailymotion.com",
+  "bilibili.com",
+  "www.bilibili.com",
+  "t.co",
+];
+
+function isSocialVideoHost(hostname) {
+  const h = (hostname || "").toLowerCase();
+  return SOCIAL_VIDEO_HOSTS.some((block) => h === block || h.endsWith("." + block));
+}
+
 function validateUrlBasic(url) {
   if (!url || typeof url !== "string") return { valid: false, reason: "URL không hợp lệ." };
 
@@ -30,8 +65,27 @@ function validateUrlBasic(url) {
   return { valid: true };
 }
 
+function validateUrlNotSocialVideo(url) {
+  const result = validateUrlBasic(url);
+  if (result.valid !== true) return result;
+
+  let hostname;
+  try {
+    hostname = new URL(url.trim()).hostname || "";
+  } catch {
+    return { valid: true };
+  }
+
+  if (isSocialVideoHost(hostname)) {
+    return { valid: false };
+  }
+
+  return { valid: true };
+}
+
 const validateUrlHooks = [
   validateUrlBasic,
+  validateUrlNotSocialVideo,
 ];
 
 function runValidateUrl(url) {
