@@ -128,18 +128,28 @@ Railway sẽ:
 2. Kiểm tra Railway có chạy `server.js` chưa (không phải `main.js`)
 3. Kiểm tra local `.env` không có `USE_WEBHOOK=true`
 
-### Railway không nhận được updates
+### Railway không nhận được updates (thông báo theo lịch vẫn gửi, nhưng lệnh không phản hồi)
 
-**Nguyên nhân:** Webhook chưa được set hoặc URL sai
+**Nguyên nhân:** Telegram đang gửi update tới webhook, nhưng URL webhook sai hoặc chưa set → update không tới Railway.
 
 **Giải pháp:**
-1. Kiểm tra Railway logs → Xem có "Webhook configured" không
-2. Kiểm tra `WEBHOOK_URL` đúng chưa
-3. Test webhook endpoint: `curl https://your-app.railway.app/health`
-4. Manual set webhook:
+1. **Railway Variables** — Bắt buộc set `WEBHOOK_URL` = đúng URL public của app:
+   - Vào Railway Dashboard → Service → **Variables**
+   - Thêm hoặc sửa: `WEBHOOK_URL=https://<tên-app-của-bạn>.up.railway.app/webhook`
+   - URL lấy ở: Service → **Settings** → **Networking** → Public domain (dạng `xxx.up.railway.app`)
+2. **Railway logs** — Sau khi deploy, xem log:
+   - Có dòng `Webhook đã set: https://...` → Telegram sẽ gửi update tới URL đó
+   - Có dòng `Webhook nhận update #123` khi bạn gửi lệnh → request đã tới server
+   - Nếu không thấy "Webhook nhận update" khi gửi lệnh → Telegram chưa gọi đúng URL (xem bước 3)
+3. **Kiểm tra Telegram đang trỏ webhook đi đâu:**
    ```bash
-   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://your-app.railway.app/webhook"
+   curl "https://api.telegram.org/bot<TELEGRAM_TOKEN>/getWebhookInfo"
    ```
+   Trong `result.url` phải là đúng `https://<railway-domain>/webhook`. Nếu sai hoặc rỗng → set lại:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<railway-domain>/webhook"
+   ```
+4. Test health: `curl https://<railway-domain>/health` → phải trả về `{"status":"ok",...}`
 
 ### Local không nhận được updates
 

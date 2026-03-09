@@ -9,7 +9,6 @@ const {
 } = require("./database");
 const { logMessage } = require("./messageLogger");
 
-/** Lấy URL file ảnh từ Telegram. Dùng khi lệnh cần vision (vd: solve). */
 async function getPhotoUrl(bot, fileId) {
   const file = await bot.getFile(fileId);
   const token = process.env.TELEGRAM_TOKEN;
@@ -92,6 +91,8 @@ function setupListen(bot) {
   const reCommand = new RegExp("^" + prefixEscaped + "(\\w+)");
   const rePrefixOnly = new RegExp("^" + prefixEscaped + "\\s*$");
 
+  const replyContexts = {};
+
   bot.on("message", async (msg) => {
     logMessage(msg);
     const chatId = msg.chat.id;
@@ -120,6 +121,50 @@ function setupListen(bot) {
       return;
     }
 
+    // Handle Reply
+    if (msg.reply_to_message && msg.reply_to_message.from?.is_bot) {
+      const key = `${chatId}_${msg.reply_to_message.message_id}`;
+      const replyData = replyContexts[key];
+      if (replyData) {
+        const cmd = commands[replyData.commandName];
+        if (cmd && typeof cmd.handleReply === "function") {
+          const allowed = await canUseCommand(bot, cmd, permission, msg);
+          if (!allowed) {
+            bot.sendMessage(chatId, "⛔ Bạn không có quyền dùng lệnh này.");
+            return;
+          }
+          const ctx = {
+            commands,
+            parsed: {},
+            aliases,
+            isAdmin: permission.isAdmin,
+            pingStart: Date.now(),
+            replyContext: replyData.context,
+            registerNextReply: (messageId, newContext) => {
+              replyContexts[`${chatId}_${messageId}`] = { commandName: replyData.commandName, context: newContext };
+              delete replyContexts[key];
+            },
+          };
+          if (msg.photo && msg.photo.length > 0) {
+            const photo = msg.photo[msg.photo.length - 1];
+            try {
+              ctx.photoUrl = await getPhotoUrl(bot, photo.file_id);
+            } catch (e) {
+              ctx.photoUrl = null;
+            }
+          }
+          try {
+            await cmd.handleReply(bot, msg, ctx);
+            return;
+          } catch (err) {
+            console.error("handleReply error:", err);
+            bot.sendMessage(chatId, "❌ " + (err?.message || "Lỗi xử lý reply.")).catch(() => {});
+            return;
+          }
+        }
+      }
+    }
+
     const match = text.match(reCommand);
     let cmdName = match ? match[1].toLowerCase() : null;
     if (!cmdName && rePrefixOnly.test(text)) cmdName = "help";
@@ -146,6 +191,10 @@ function setupListen(bot) {
           aliases,
           isAdmin: permission.isAdmin,
           pingStart: Date.now(),
+          commandName: actualCmdName,
+          registerReplyContext: (messageId, context) => {
+            replyContexts[`${chatId}_${messageId}`] = { commandName: actualCmdName, context };
+          },
         };
         if (msg.photo && msg.photo.length > 0) {
           const photo = msg.photo[msg.photo.length - 1];

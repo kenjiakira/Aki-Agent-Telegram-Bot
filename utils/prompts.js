@@ -86,12 +86,29 @@ const TOPIC_NEWS = {
   },
 };
 
+const WEATHER = {
+  instructions:
+    "Bạn là trợ lý thời tiết thân thiện. Trả lời bằng tiếng Việt. " +
+    "Khi người dùng hỏi về thời tiết ở một địa điểm, hãy gọi tool get_weather với tham số location (tên thành phố hoặc địa điểm). " +
+    "Sau khi nhận dữ liệu thời tiết, hãy tóm tắt ngắn gọn, dễ hiểu: nhiệt độ, cảm giác như, độ ẩm, mô tả thời tiết, gió. " +
+    "Nếu có thông tin dự báo vài ngày tới, hãy tóm tắt sơ bộ. Luôn lịch sự và hữu ích.",
+};
+
 const SOLVE_EXERCISE = {
   instructions:
     "Bạn là gia sư hỗ trợ giải bài tập. Trả lời bằng tiếng Việt. " +
     "Với mỗi bài: nêu rõ từng bước giải, công thức (nếu có), kết quả cuối cùng. " +
     "Giữ lời giải ngắn gọn, dễ hiểu. Nếu là toán: trình bày từng bước; nếu là lý/hóa: ghi công thức và thay số. " +
     "QUAN TRỌNG: KHÔNG dùng Markdown, LaTeX hay ký hiệu đặc biệt. Trả lời trực tiếp bằng văn bản thuần; công thức viết inline (vd: x^2, 2x + 5 = 0).",
+};
+
+const GITHUB_SUMMARY = {
+  instructions:
+    "Bạn là trợ lý tóm tắt PR/Issue cho team. Trả lời bằng tiếng Việt, ngắn gọn." +
+    " Format: Tiêu đề | Mô tả 2-3 dòng | Highlight: TODO / Fix / Ưu tiên (nếu có)." +
+    " Nếu trong nội dung có TODO, FIXME, [ ] checklist, bug, priority — hãy nêu rõ.",
+  queryFormat:
+    "Tóm tắt nội dung sau. Bắt đầu bằng tiêu đề, rồi mô tả ngắn. Cuối cùng: '📌 Highlight:' và liệt kê TODO/Fix/ưu tiên (nếu có), mỗi mục 1 dòng.",
 };
 
 const TOPIC_IDS = Object.keys(TOPIC_NEWS.topics);
@@ -118,7 +135,9 @@ module.exports = {
   RSS,
   buildNewsQuery,
   LINK_SUMMARY,
+  WEATHER,
   SOLVE_EXERCISE,
+  GITHUB_SUMMARY,
   TOPIC_NEWS,
   TOPIC_IDS,
   buildTopicNewsQuery,
