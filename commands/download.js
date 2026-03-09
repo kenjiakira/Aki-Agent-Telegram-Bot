@@ -14,8 +14,18 @@ const {
   getImageUrls,
 } = require("../lib/zmio");
 
+const ALBUM_LIMIT = 10;
+
 function hasAnyDownloadApi() {
   return hasApiUrl() || hasZmioApiKey();
+}
+
+function chunkMedia(media, limit = ALBUM_LIMIT) {
+  const chunks = [];
+  for (let i = 0; i < media.length; i += limit) {
+    chunks.push(media.slice(i, i + limit));
+  }
+  return chunks;
 }
 
 const config = {
@@ -95,7 +105,10 @@ async function processTikTokDownload(bot, chatId, url) {
       if (media.length === 1) {
         await bot.sendPhoto(chatId, media[0].media, { caption: media[0].caption });
       } else {
-        await bot.sendMediaGroup(chatId, media);
+        const chunks = chunkMedia(media);
+        for (let i = 0; i < chunks.length; i++) {
+          await bot.sendMediaGroup(chatId, chunks[i]);
+        }
       }
       return;
     }
@@ -175,7 +188,10 @@ async function processZmioDownload(bot, chatId, url) {
       if (media.length === 1) {
         await bot.sendPhoto(chatId, media[0].media, { caption: media[0].caption });
       } else {
-        await bot.sendMediaGroup(chatId, media);
+        const chunks = chunkMedia(media);
+        for (let i = 0; i < chunks.length; i++) {
+          await bot.sendMediaGroup(chatId, chunks[i]);
+        }
       }
       return;
     }
