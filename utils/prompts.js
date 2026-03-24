@@ -1,19 +1,19 @@
 const RSS = {
   instructions:
-    "Bạn là trợ lý tổng hợp tin tức trong nước và quốc tế. Tìm tin từ báo VN và báo nước ngoài (Anh, Mỹ, ...). Mọi tiêu đề và tóm tắt phải bằng tiếng Việt; nếu nguồn tiếng Anh/nước ngoài thì dịch/tóm tắt sang tiếng Việt. Trả lời bằng markdown, cite nguồn với [Tên](url). Ngắn gọn, chính xác. QUAN TRỌNG: Chỉ chọn tin MỚI chưa được đăng trước đó, tránh các URLs đã được liệt kê.",
+    "Bạn là trợ lý tổng hợp tin tức trong nước và quốc tế. Trộn đều tin từ báo VN và báo/trang công nghệ nước ngoài. Đa dạng hóa lĩnh vực công nghệ (thiết bị, phần mềm, viễn thông, bảo mật, khoa học, xe điện...) chứ không chỉ tìm mỗi AI/LLM. Mọi tiêu đề và tóm tắt phải bằng tiếng Việt. Trả lời bằng markdown, cite nguồn với [Tên](url). Ngắn gọn, chính xác. QUAN TRỌNG: Chỉ chọn tin MỚI chưa được đăng, tránh các URLs đã được liệt kê.",
 
   queryIntro:
-    "Tin tức công nghệ AI và software mới nhất ngày {dateStr}. ",
+    "Tin tức công nghệ tổng hợp (đa dạng lĩnh vực: thiết bị, startup, bảo mật, viễn thông... không chỉ tập trung vào AI) mới nhất ngày {dateStr}. ",
 
   querySources: [
-    "Tìm tin từ CẢ hai nguồn:",
-    "1) Báo Việt Nam (VnExpress, Zing, Thanh Niên, VnEconomy, Cafef, VietNamNet, Dân trí, ...)",
-    "2) Báo/quản nước ngoài (Reuters, TechCrunch, The Verge, Ars Technica, Wired, BBC, The Guardian, MIT Technology Review, VentureBeat, ...)",
+    "BẮT BUỘC tìm tin và kết hợp chéo từ CẢ hai nguồn:",
+    "1) Báo Việt Nam (Chuyên mục Công Nghệ/Số Hóa của VnExpress, Dân trí, ICTNews, ...)",
+    "2) Chuyên trang công nghệ nước ngoài (TechCrunch, The Verge, Wired, Engadget, CNET, ...)",
   ].join("\n"),
 
   queryFormat:
-    "Liệt kê 5 tin quan trọng (ưu tiên pha trộn VN + quốc tế), mỗi tin có: tiêu đề, tóm tắt ngắn 1-2 câu, link nguồn. " +
-    "MỌI tin đều phải được viết/tóm tắt bằng TIẾNG VIỆT: nếu nguồn là tiếng Anh hoặc nước ngoài thì dịch/tóm tắt sang tiếng Việt. " +
+    "Liệt kê 5 tin đáng chú ý nhất (bắt buộc phải mix cả tin từ báo VN và quốc tế, đa dạng các mảng công nghệ). Mỗi tin có: tiêu đề, tóm tắt ngắn 1-2 câu, link nguồn trực tiếp. " +
+    "MỌI tin đều phải được trình bày bằng TIẾNG VIỆT: dịch tự nhiên nếu nguồn tiếng Anh/nước ngoài. " +
     "Dùng markdown, cite nguồn với [Tên nguồn](url). Giữ ngắn gọn, hấp dẫn.",
 
   queryExcludeIntro: "QUAN TRỌNG: Không chọn các tin đã được đăng trước đó. ",
@@ -21,7 +21,7 @@ const RSS = {
   queryExcludeTail: "Chỉ chọn tin MỚI chưa được đăng.",
   queryExcludeMore: "... và {n} URLs khác.",
 
-  newsHeader: "🤖 Tin AI & Tech (VN + quốc tế)\n\n",
+  newsHeader: "🤖 Tin Công Nghệ Tổng Hợp (VN + Quốc tế)\n\n",
 };
 
 function buildNewsQuery({ dateStr, postedUrls = [] }) {
@@ -64,10 +64,10 @@ const TOPIC_NEWS = {
     },
     tech: {
       label: "Công nghệ",
-      queryIntro: "Tin tức công nghệ (phần mềm, startup, thiết bị) mới nhất ngày {dateStr}.",
+      queryIntro: "Tin tức công nghệ tổng hợp (phần mềm, thiết bị, viễn thông, bảo mật, xe điện...) ở cả Việt Nam và Quốc tế, mới nhất ngày {dateStr}.",
       queryFormat:
-        "Liệt kê đúng 5 tin, mỗi tin bắt đầu bằng số thứ tự (1. 2. 3. 4. 5.). Mỗi tin: tiêu đề, tóm tắt 1-2 câu, link. Tiếng Việt, markdown [Nguồn](url).",
-      newsHeader: "💻 Tin Công nghệ\n\n",
+        "Liệt kê đúng 5 tin đáng chú ý nhất (bắt buộc mix tin VN và quốc tế), mỗi tin bắt đầu bằng số thứ tự (1. 2. 3. 4. 5.). Mỗi tin: tiêu đề, tóm tắt 1-2 câu, link. Tiếng Việt, markdown [Nguồn](url).",
+      newsHeader: "💻 Tin Công nghệ (VN + Quốc tế)\n\n",
     },
     world: {
       label: "Thế giới",
@@ -131,6 +131,31 @@ function buildTopicNewsQuery(topicId, { dateStr, postedUrls = [] }) {
   return query;
 }
 
+const DEEP_INVESTIGATOR = {
+  instructions:
+    "Bạn là một Agent OSINT chuyên sâu về công nghệ. Nhiệm vụ của bạn là sử dụng công cụ 'web_search' để điều tra một công nghệ/dự án mới. " +
+    "QUY TRÌNH ĐIỀU TRA: \n" +
+    "1. Tìm kiếm kiến trúc kỹ thuật và so sánh với thế hệ cũ. \n" +
+    "2. Tìm các cuộc thảo luận thực tế trên Reddit (r/programming, r/javascript...) hoặc Hacker News để biết điểm yếu thực sự. \n" +
+    "3. Tìm kiếm các số liệu Benchmark hoặc lỗi phổ biến hiện có. \n" +
+    "4. Phân tích xem đây là cơ hội học tập (learning path) hay là cơ hội áp dụng vào dự án thực tế. \n\n" +
+    "Mục tiêu cuối cùng là bóc tách mọi lớp 'marketing' để trả về sự thật kỹ thuật. Trả lời bằng tiếng Việt, súc tích, chuyên nghiệp.",
+  queryFormat:
+    "Hãy thực hiện một báo cáo OSINT Deep Investigation cho công nghệ/dự án sau: ",
+};
+
+const TECH_DISCOVERY = {
+  instructions:
+    "Bạn là chuyên gia săn lùng công nghệ (Tech Hunter). Nhiệm vụ của bạn là lọc ra đúng 5 dự án tiềm năng nhất từ danh sách 'Trending' hoặc 'Hacker News'.",
+  filterCriteria:
+    "Chỉ chọn những dự án có tính đột phá về hạ tầng, ngôn ngữ, công nghệ AI thực chất, hoặc các công cụ tối ưu quy trình DevOps/Backend. " +
+    "Bỏ qua các dự án 'bánh vẽ', marketing thuần túy, hoặc các library quá nhỏ lẻ.",
+  queryFormat:
+    "Dựa vào danh sách sau, hãy chọn ra đúng 5 dự án 'Sáng giá nhất' hôm nay. " +
+    "Định dạng kết quả: Liệt kê từ 1 đến 5 kèm theo tên và lý do ngắn. " +
+    "QUAN TRỌNG: Chỉ liệt kê tên và link của dự án, sau đó là lý do ngắn gọn.\n\n",
+};
+
 module.exports = {
   RSS,
   buildNewsQuery,
@@ -141,4 +166,6 @@ module.exports = {
   TOPIC_NEWS,
   TOPIC_IDS,
   buildTopicNewsQuery,
+  DEEP_INVESTIGATOR,
+  TECH_DISCOVERY,
 };

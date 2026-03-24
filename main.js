@@ -1,7 +1,12 @@
-/**
- * Chạy bot: polling (dev) hoặc webhook (không chạy HTTP server).
- * Dùng khi: npm run dev hoặc node main.js / node index.js
- */
+if (typeof File === "undefined") {
+  global.File = class extends Blob {
+    constructor(parts, filename, options = {}) {
+      super(parts, options);
+      this.name = filename;
+      this.lastModified = options.lastModified || Date.now();
+    }
+  };
+}
 const { createAppBot } = require("./core/bot");
 const { createLogger } = require("./utils/logger");
 

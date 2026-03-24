@@ -296,6 +296,12 @@ function setupListen(bot) {
         return;
       }
       const ctx = { commands, parsed: {}, aliases, isAdmin: permission.isAdmin };
+      const cqChatId = query.message?.chat?.id;
+      const cqMessageId = query.message?.message_id;
+      if (cqChatId != null && cqMessageId != null) {
+        const stored = replyContexts[`${cqChatId}_${cqMessageId}`];
+        if (stored) ctx.replyContext = stored.context;
+      }
       const handler = findCallbackHandler(commands, data);
       if (handler) {
         const fakeMsg = { chat: query.message.chat, from: query.from };
