@@ -45,8 +45,8 @@ async function fetchNewsByTopic(topicId, opts = {}) {
 
 
 async function postNewsByTopic(bot, topicId, force = false, targetChatId = null) {
-  const chatId = targetChatId || process.env.CHANNEL_ID;
-  if (!chatId) throw new Error("CHANNEL_ID hoặc targetChatId chưa được cấu hình");
+  const chatId = targetChatId || process.env.AUTO_NEWS_CHAT_ID;
+  if (!chatId) throw new Error("AUTO_NEWS_CHAT_ID hoặc targetChatId chưa được cấu hình");
   if (!TOPIC_NEWS.topics[topicId]) throw new Error(`Chủ đề không hợp lệ: ${topicId}. Dùng: ${TOPIC_IDS.join(", ")}`);
 
   const content = await fetchNewsByTopic(topicId);
@@ -117,11 +117,11 @@ async function sendAutoNewsToSubscribers(bot, topicId) {
   ]);
   let chatIds = [...userChatIds, ...groupChatIds];
   if (chatIds.length === 0) {
-    const fallback = process.env.AUTO_NEWS_CHAT_ID || process.env.CHANNEL_ID;
+    const fallback = process.env.AUTO_NEWS_CHAT_ID;
     if (fallback) chatIds = [fallback];
   }
   if (chatIds.length === 0) {
-    console.log("⚠️ Không có subscriber tin tự động và không cấu hình AUTO_NEWS_CHAT_ID/CHANNEL_ID — bỏ qua.");
+    console.log("⚠️ Không có subscriber tin tự động và không cấu hình AUTO_NEWS_CHAT_ID — bỏ qua.");
     return;
   }
 

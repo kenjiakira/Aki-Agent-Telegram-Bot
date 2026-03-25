@@ -6,10 +6,10 @@ const config = {
   name: "investigate",
   description: "OSINT Tech Investigator: Cào và phân tích công nghệ đa nguồn (GitHub, Reddit, Hacker News...)",
   useBy: 0,
-  category: "utility",
+  category: "general",
   usePrefix: true,
   aliases: ["osint", "checktech", "deep"],
-  callbacks: ["investigate_"], // Cho phép xử lý callback từ các nút điều tra
+  callbacks: ["investigate_"], 
 };
 
 async function execute(bot, msg, ctx) {

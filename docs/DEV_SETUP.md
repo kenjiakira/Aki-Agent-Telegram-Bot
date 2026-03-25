@@ -23,7 +23,7 @@ Khi cả Railway và local đều dùng **polling**, cả 2 sẽ cùng nhận 1 
 ```env
 TELEGRAM_TOKEN=your_token
 OPENAI_API_KEY=your_key
-CHANNEL_ID=@your_channel
+AUTO_NEWS_CHAT_ID=@your_channel
 ADMIN_USER_IDS=your_user_id
 OPENAI_NEWS_MODEL=gpt-4.1-mini
 

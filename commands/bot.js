@@ -5,10 +5,6 @@ const { getDisplayName } = require("../lib/username");
 const TRIGGER_WORDS = [
   "bot",
   "bluenest",
-  "ai",
-  "aiv",
-  "trợ lý",
-  "assistant",
 ];
 
 const BLUENEST_SYSTEM_PROMPT = `Bạn là BlueNest, một trợ lý AI thân thiện và hữu ích. 

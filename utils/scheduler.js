@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const { sendAutoNewsToSubscribers } = require("./rss");
 const { cleanupOldNews } = require("./database");
 const { loadScheduledCommands } = require("../commands/schedule");
+const { TZ } = require("./time");
 
 const AUTO_TOPIC = process.env.AUTO_NEWS_TOPIC || "ai";
 
@@ -14,7 +15,7 @@ function setupScheduler(bot) {
     } catch (err) {
       console.error("Error posting auto news:", err.message);
     }
-  });
+  }, { timezone: TZ });
 
   cron.schedule("0 2 * * 0", async () => {
     console.log("Cleaning up old news...");
@@ -24,7 +25,7 @@ function setupScheduler(bot) {
     } catch (err) {
       console.error("Error cleanup:", err.message);
     }
-  });
+  }, { timezone: TZ });
 
   setTimeout(() => {
     loadScheduledCommands(bot).catch(err => {
