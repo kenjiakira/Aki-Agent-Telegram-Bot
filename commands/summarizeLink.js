@@ -1,4 +1,4 @@
-const { getModel, createResponse } = require("../lib/openai");
+const { getModel, createResponse } = require("../lib/llm");
 const { LINK_SUMMARY } = require("../utils/prompts");
 const { runValidateUrl } = require("../hooks/summarizeLinkHooks");
 

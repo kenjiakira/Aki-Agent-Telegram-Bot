@@ -1,4 +1,4 @@
-const { getModel, createAgentResponse } = require("../lib/openai");
+const { getModel, createAgentResponse } = require("../lib/llm");
 const { getDisplayName } = require("../lib/username");
 const { fetchWeather } = require("../lib/openweather");
 const { WEATHER } = require("../utils/prompts");

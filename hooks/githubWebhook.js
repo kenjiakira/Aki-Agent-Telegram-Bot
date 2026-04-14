@@ -1,4 +1,4 @@
-const { createResponse } = require("../lib/openai");
+const { createResponse } = require("../lib/llm");
 const { verifySignature, parseEvent } = require("../lib/github");
 const { GITHUB_SUMMARY } = require("../utils/prompts");
 const { createLogger } = require("../utils/logger");

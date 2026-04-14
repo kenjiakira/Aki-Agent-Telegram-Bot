@@ -1,6 +1,6 @@
 const { getTrendingRepos } = require("../lib/github");
 const { DEEP_INVESTIGATOR, TECH_DISCOVERY } = require("../utils/prompts");
-const { createResponse, getModel } = require("../lib/openai");
+const { createResponse, getModel } = require("../lib/llm");
 
 const config = {
   name: "investigate",

@@ -1,4 +1,4 @@
-const { getModel, createResponse } = require("../lib/openai");
+const { getModel, createResponse } = require("../lib/llm");
 const {
   isAlreadyPosted,
   savePostedNews,
